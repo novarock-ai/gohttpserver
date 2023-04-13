@@ -15,93 +15,30 @@
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/style.css">
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/themes/[[.Theme]].css">
 </head>
+<!-- 
+<script src="[[.Prefix]]/-/assets/js/iframeResizer.min.js"></script> -->
+
+<script src="[[.Prefix]]/-/assets/js/iframeResizer.contentWindow.min.js"></script>
 
 <body id="app">
-  <nav class="navbar navbar-default">
-    <div class="container">
-      <div class="container">
-        <div class="navbar-header">
-          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-2">
-            <span class="sr-only">Toggle navigation</span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-            <span class="icon-bar"></span>
-          </button>
-          <a class="navbar-brand" href="[[.Prefix]]/">[[.Title]]</a>
-        </div>
-        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-2">
-          <ul class="nav navbar-nav">
-            <li class="hidden-xs">
-              <a href="javascript:void(0)" v-on:click='genQrcode()'>
-                View in Phone
-                <span class="glyphicon glyphicon-qrcode"></span>
-              </a>
-            </li>
-            [[if eq .AuthType "openid"]]
-            <template v-if="!user.email">
-              <a href="/-/login" class="btn btn-sm btn-default navbar-btn">
-                Sign in <span class="glyphicon glyphicon-user"></span>
-              </a>
-            </template>
-            <template v-else>
-              <a href="/-/logout" class="btn btn-sm btn-default navbar-btn">
-                <span v-text="user.name"></span>
-                <i class="fa fa-sign-out"></i>
-              </a>
-            </template>
-            [[end]]
-            [[if eq .AuthType "oauth2-proxy"]]
-            <template v-if="!user.email">
-                <a href="#" class="btn btn-sm btn-default navbar-btn">
-                    Guest <span class="glyphicon glyphicon-user"></span>
-                </a>
-            </template>
-            <template v-else>
-                <a href="/-/logout" class="btn btn-sm btn-default navbar-btn">
-                    <span v-text="user.name"></span>
-                    <i class="fa fa-sign-out"></i>
-                </a>
-            </template>
-            [[end]]
-          </ul>
-          <form class="navbar-form navbar-right">
-            <div class="input-group">
-              <input type="text" name="search" class="form-control" placeholder="Search text" v-bind:value="search"
-                autofocus>
-              <span class="input-group-btn">
-                <button class="btn btn-default" type="submit">
-                  <span class="glyphicon glyphicon-search"></span>
-                </button>
-              </span>
-            </div>
-          </form>
-          <ul id="nav-right-bar" class="nav navbar-nav navbar-right">
-          </ul>
-        </div>
-      </div>
-    </div>
-  </nav>
-  <div class="container">
-    <div class="col-md-12">
-      <ol class="breadcrumb">
-        <li>
-          <a v-on:click='changePath("/", $event)' href="/"><i class="fa fa-home"></i></a>
-        </li>
-        <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
-          <a v-on:click='changePath(bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
-        </li>
-        <li v-if="breadcrumb.length >= 1">
-          {{breadcrumb.slice(-1)[0].name}}
-        </li>
-      </ol>
-      <table class="table table-hover" v-if="!previewMode">
-        <thead>
+  <div class="container" style="padding-left:unset;padding-right:unset">
+    <div class="col-md-12" style="padding:unset;">
+      <div style="position:sticky;top:0;z-index:999;background-color:#fff">
+        <ol class="breadcrumb">
+          <li>
+            <a v-on:click='changePath("/", $event)' href="/"><i class="fa fa-home"></i></a>
+          </li>
+          <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
+            <a v-on:click='changePath(bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
+          </li>
+          <li v-if="breadcrumb.length >= 1">
+            {{breadcrumb.slice(-1)[0].name}}
+          </li>
+        </ol>
+        <div>
           <tr>
             <td colspan=4>
-              <!-- <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
-                Back <i class="fa" v-bind:class='showHidden ? "fa-eye" : "fa-eye-slash"'></i>
-              </button> -->
-              <div>
+              <div style="float:left">
                 <button class="btn btn-xs btn-default" onclick="history.back()">
                   Back <i class="fa fa-arrow-left"></i>
                 </button>
@@ -115,18 +52,42 @@
                   New Folder <i class="fa fa-folder"></i>
                 </button>
               </div>
+              <div style="float:righr">
+                <form class="navbar-form navbar-right">
+                  <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Search text" v-bind:value="search" />
+                    <span class="input-group-btn">
+                      <button class="btn btn-default" type="submit">
+                        <span class="glyphicon glyphicon-search"></span>
+                      </button>
+                    </span>
+                  </div>
+                </form>
+              </div>
             </td>
           </tr>
-          <tr>
+          <!-- <tr>
             <th>Name</th>
             <th>Size</th>
             <th class="hidden-xs">
               <span style="cursor: pointer" v-on:click='mtimeTypeFromNow = !mtimeTypeFromNow'>ModTime</span>
             </th>
             <th>Actions</th>
-          </tr>
-        </thead>
+          </tr> -->
+        </div>
+      </div>
+      <table class="table table-hover" v-if="!previewMode">
         <tbody>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Size</th>
+              <th class="hidden-xs">
+                <span style="cursor: pointer" v-on:click='mtimeTypeFromNow = !mtimeTypeFromNow'>ModTime</span>
+              </th>
+              <th>Actions</th>
+            </tr>
+          </thead>
           <tr v-for="f in computedFiles">
             <td>
               <a v-on:click='clickFileOrDir(f, $event)' href="{{getEncodePath(f.name)}}">
@@ -134,7 +95,7 @@
                 <i style="padding-right: 0.5em" class="fa" v-bind:class='genFileClass(f)'></i> {{f.name}}
               </a>
               <!-- for search -->
-              <button v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
+              <button id="ding-test" v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
                 <i class="fa fa-folder-open-o"></i>
               </button>
             </td>
@@ -154,7 +115,7 @@
                 </button>
               </template>
               <template v-if="f.type == 'file'">
-                <a class="btn btn-default btn-xs hidden-xs" href="{{genDownloadURL(f)}}">
+                <a style="display:inline-block !important;" class="btn btn-default btn-xs hidden-xs" href="{{genDownloadURL(f)}}">
                   <span class="hidden-xs">Download</span>
                   <span class="glyphicon glyphicon-download-alt"></span>
                 </a>
@@ -165,13 +126,6 @@
                 <button class="btn btn-default btn-xs" v-on:click="showInfo(f)">
                   <span class="glyphicon glyphicon-info-sign"></span>
                 </button>
-                <button class="btn btn-default btn-xs hidden-xs" v-on:click="genQrcode(f.name)">
-                  <span v-if="shouldHaveQrcode(f.name)">QRCode</span>
-                  <span class="glyphicon glyphicon-qrcode"></span>
-                </button>
-                <a class="btn btn-default btn-xs visible-xs" v-if="shouldHaveQrcode(f.name)" href="{{genInstallURL(f.name)}}">
-                  Install <i class="fa fa-cube"></i>
-                </a>
                 <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
                   <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
                 </button>
@@ -181,42 +135,7 @@
         </tbody>
       </table>
     </div>
-    <div class="col-md-12" id="preview" v-if="preview.filename">
-      <div class="panel panel-default">
-        <div class="panel-heading">
-          <h3 class="panel-title" style="font-weight: normal">
-            <i class="fa" v-bind:class='genFileClass(previewFile)'></i> {{preview.filename}}
-          </h3>
-        </div>
-        <div class="panel-body">
-          <article class="markdown-body">{{{preview.contentHTML }}}
-          </article>
-        </div>
-      </div>
-    </div>
     <div class="col-md-12" id="content">
-      <!-- Small qrcode modal -->
-      <div id="qrcode-modal" class="modal fade" tabindex="-1" role="dialog">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-              <h4 class="modal-title">
-                <span id="qrcode-title"></span>
-                <a style="font-size: 0.6em" href="#" id="qrcode-link">[view]</a>
-              </h4>
-            </div>
-            <div class="modal-body clearfix">
-              <div id="qrcodeCanvas" class="pull-left"></div>
-              <div id="qrcodeRight" class="pull-left">
-                <p>
-                  <a href="#">下载链接</a>
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
       <!-- Upload modal-->
       <div id="upload-modal" class="modal fade" tabindex="-1" role="dialog">
         <div class="modal-dialog">
@@ -254,19 +173,17 @@
         </div>
       </div>
     </div>
-    <div class="col-md-12">
+    <!-- <div class="col-md-12">
       <div id="footer" class="pull-right" style="margin: 2em 1em">
         <a href="https://github.com/codeskyblue/gohttpserver">gohttpserver ({{version}})</a>, by <a href="https://github.com/codeskyblue">codeskyblue</a>.
       </div>
-    </div>
+    </div> -->
   </div>
   <script>
     window.URL_PFEFIX = "[[.Prefix]]"
   </script>
   <script src="[[.Prefix]]/-/assets/js/jquery-3.1.0.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/jquery.qrcode.js"></script>
   <script src="[[.Prefix]]/-/assets/js/jquery.scrollUp.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/qrcode.js"></script>
   <script src="[[.Prefix]]/-/assets/js/vue-1.0.min.js"></script>
   <script src="[[.Prefix]]/-/assets/js/showdown-1.6.4.min.js"></script>
   <script src="[[.Prefix]]/-/assets/js/moment.min.js"></script>
@@ -299,5 +216,4 @@
     ga('send', 'pageview');
   </script> [[ end ]]
 </body>
-
 </html>

@@ -1,15 +1,12 @@
-FROM golang:1.16
+FROM golang:1.18 AS builder
 WORKDIR /app/gohttpserver
 ADD . /app/gohttpserver
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags '-X main.VERSION=docker' -o gohttpserver
 
-FROM debian:stretch
+FROM alpine
+
 WORKDIR /app
-RUN mkdir -p /app/public
-RUN apt-get update && apt-get install -y ca-certificates
-VOLUME /app/public
-ADD assets ./assets
-COPY --from=0 /app/gohttpserver/gohttpserver .
-EXPOSE 8000
-ENTRYPOINT [ "/app/gohttpserver", "--root=/app/public" ]
-CMD []
+COPY assets .
+COPY --from=builder /app/gohttpserver/gohttpserver .
+EXPOSE 9999
+ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999" ]

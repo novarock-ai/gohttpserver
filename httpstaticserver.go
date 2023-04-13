@@ -7,9 +7,12 @@ import (
 	"fmt"
 	"html/template"
 	"io"
-	"io/ioutil"
+	"io/fs"
+
+	// "io/ioutil"
+
+	// "io/ioutil"
 	"log"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -39,7 +42,8 @@ type ApkInfo struct {
 
 type IndexFileItem struct {
 	Path string
-	Info os.FileInfo
+	// Info os.FileInfo
+	Info fs.FileInfo
 }
 
 type Directory struct {
@@ -64,6 +68,7 @@ type HTTPStaticServer struct {
 }
 
 func NewHTTPStaticServer(root string) *HTTPStaticServer {
+	fmt.Println("这里的 root: ", root)
 	// if root == "" {
 	// 	root = "./"
 	// }
@@ -125,6 +130,7 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 }
 
 func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
+	// fmt.Println("这里的 path 是: ", mux.Vars(r)["path"])
 	path := mux.Vars(r)["path"]
 	realPath := s.getRealPath(r)
 	if r.FormValue("json") == "true" {
@@ -257,9 +263,9 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 
 	// Note: very large size file might cause poor performance
 	// _, copyErr = io.Copy(dst, file)
-	buf := s.bufPool.Get().([]byte)
-	defer s.bufPool.Put(buf)
-	_, copyErr = io.CopyBuffer(dst, file, buf)
+	buf := s.bufPool.Get().(*[]byte)
+	defer s.bufPool.Put(&buf)
+	_, copyErr = io.CopyBuffer(dst, file, *buf)
 	dst.Close()
 	// }
 	if copyErr != nil {
@@ -354,19 +360,19 @@ func (s *HTTPStaticServer) hZip(w http.ResponseWriter, r *http.Request) {
 	CompressToZip(w, s.getRealPath(r))
 }
 
-func (s *HTTPStaticServer) hUnzip(w http.ResponseWriter, r *http.Request) {
-	vars := mux.Vars(r)
-	zipPath, path := vars["zip_path"], vars["path"]
-	ctype := mime.TypeByExtension(filepath.Ext(path))
-	if ctype != "" {
-		w.Header().Set("Content-Type", ctype)
-	}
-	err := ExtractFromZip(filepath.Join(s.Root, zipPath), path, w)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-}
+// func (s *HTTPStaticServer) hUnzip(w http.ResponseWriter, r *http.Request) {
+// 	vars := mux.Vars(r)
+// 	zipPath, path := vars["zip_path"], vars["path"]
+// 	ctype := mime.TypeByExtension(filepath.Ext(path))
+// 	if ctype != "" {
+// 		w.Header().Set("Content-Type", ctype)
+// 	}
+// 	err := ExtractFromZip(filepath.Join(s.Root, zipPath), path, w)
+// 	if err != nil {
+// 		http.Error(w, err.Error(), 500)
+// 		return
+// 	}
+// }
 
 func combineURL(r *http.Request, path string) *url.URL {
 	return &url.URL{
@@ -446,14 +452,14 @@ func (s *HTTPStaticServer) genPlistLink(httpPlistLink string) (plistUrl string, 
 	}
 	defer resp.Body.Close()
 
-	data, _ := ioutil.ReadAll(resp.Body)
+	data, _ := io.ReadAll(resp.Body)
 	retData, err := http.Post(pp, "text/xml", bytes.NewBuffer(data))
 	if err != nil {
 		return
 	}
 	defer retData.Body.Close()
 
-	jsonData, _ := ioutil.ReadAll(retData.Body)
+	jsonData, _ := io.ReadAll(retData.Body)
 	var ret map[string]string
 	if err = json.Unmarshal(jsonData, &ret); err != nil {
 		return
@@ -462,9 +468,9 @@ func (s *HTTPStaticServer) genPlistLink(httpPlistLink string) (plistUrl string, 
 	return
 }
 
-func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
-	http.ServeFile(w, r, s.getRealPath(r))
-}
+// func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
+// 	http.ServeFile(w, r, s.getRealPath(r))
+// }
 
 type HTTPFileInfo struct {
 	Name    string `json:"name"`
@@ -574,25 +580,28 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
-
+	// fileInfoMap := make(map[string]fs.FileInfo, 0)
+	dirInfoMap := make(map[string]os.DirEntry, 0)
 	if search != "" {
 		results := s.findIndex(search)
 		if len(results) > 50 { // max 50
 			results = results[:50]
 		}
 		for _, item := range results {
-			if filepath.HasPrefix(item.Path, requestPath) {
+			if strings.HasPrefix(item.Path, requestPath) {
 				fileInfoMap[item.Path] = item.Info
 			}
 		}
 	} else {
-		infos, err := ioutil.ReadDir(realPath)
+		infos, err := os.ReadDir(realPath)
+		// infos, err := ioutil.ReadDir(realPath)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		for _, info := range infos {
-			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
+			// fileInfoMap[filepath.Join(requestPath, info.Name())] = info
+			dirInfoMap[filepath.Join(requestPath, info.Name())] = info
 		}
 	}
 
@@ -624,6 +633,47 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Type = "file"
 			lr.Size = info.Size() // formatSize(info)
 		}
+		// lr.Type = "file"
+		// lr.Size = info.Size() // formatSize(info)
+		lrs = append(lrs, lr)
+	}
+
+	for path, info := range dirInfoMap {
+		if !auth.canAccess(info.Name()) {
+			continue
+		}
+		_info, err := info.Info()
+		if err != nil {
+			log.Fatal("get dir info failed", err)
+			continue
+		}
+		lr := HTTPFileInfo{
+			Name:    _info.Name(),
+			Path:    path,
+			ModTime: _info.ModTime().UnixNano() / 1e6,
+		}
+		if search != "" {
+			name, err := filepath.Rel(requestPath, path)
+			if err != nil {
+				log.Println(requestPath, path, err)
+			}
+			lr.Name = filepath.ToSlash(name) // fix for windows
+		}
+		if info.IsDir() {
+			name := deepPath(realPath, info.Name())
+			lr.Name = name
+			lr.Path = filepath.Join(filepath.Dir(path), name)
+			lr.Type = "dir"
+			lr.Size = s.historyDirSize(lr.Path)
+		} else {
+			lr.Type = "file"
+			lr.Size = _info.Size() // formatSize(info)
+		}
+		// name := deepPath(realPath, info.Name())
+		// lr.Name = name
+		// lr.Path = filepath.Join(filepath.Dir(path), name)
+		// lr.Type = "dir"
+		// lr.Size = s.historyDirSize(lr.Path)
 		lrs = append(lrs, lr)
 	}
 
@@ -668,7 +718,7 @@ func (s *HTTPStaticServer) historyDirSize(dir string) int64 {
 	}
 
 	for _, fitem := range s.indexes {
-		if filepath.HasPrefix(fitem.Path, dir) {
+		if strings.HasPrefix(fitem.Path, dir) {
 			size += fitem.Info.Size()
 		}
 	}
@@ -726,7 +776,7 @@ func (s *HTTPStaticServer) readAccessConf(realPath string) (ac AccessConf) {
 		realPath = filepath.Dir(realPath)
 	}
 	cfgFile := filepath.Join(realPath, YAMLCONF)
-	data, err := ioutil.ReadFile(cfgFile)
+	data, err := os.ReadFile(cfgFile)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return
@@ -744,7 +794,7 @@ func deepPath(basedir, name string) string {
 	// loop max 5, incase of for loop not finished
 	maxDepth := 5
 	for depth := 0; depth <= maxDepth; depth += 1 {
-		finfos, err := ioutil.ReadDir(filepath.Join(basedir, name))
+		finfos, err := os.ReadDir(filepath.Join(basedir, name))
 		if err != nil || len(finfos) != 1 {
 			break
 		}
@@ -762,7 +812,7 @@ func assetsContent(name string) string {
 	if err != nil {
 		panic(err)
 	}
-	data, err := ioutil.ReadAll(fd)
+	data, err := io.ReadAll(fd)
 	if err != nil {
 		panic(err)
 	}
@@ -776,7 +826,7 @@ var (
 
 func init() {
 	funcMap = template.FuncMap{
-		"title": strings.Title,
+		"title": strings.ToTitle,
 		"urlhash": func(path string) string {
 			httpFile, err := Assets.Open(path)
 			if err != nil {
@@ -807,7 +857,7 @@ func renderHTML(w http.ResponseWriter, name string, v interface{}) {
 
 func checkFilename(name string) error {
 	if strings.ContainsAny(name, "\\/:*<>|") {
-		return errors.New("Name should not contains \\/:*<>|")
+		return errors.New("name should not contains \\/:*<>|")
 	}
 	return nil
 }

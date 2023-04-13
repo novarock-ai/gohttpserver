@@ -1,0 +1,15 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Launching Web",
+      "type": "go",
+      "mode": "debug",
+      "console": "integratedTerminal",
+      "args": ["-r", "/Users/dingshinn/Desktop/streamlit-file-browser/example_artifacts/deep/ding", "--port", "9999", "--upload", "--auth-type", "openid"],
+      "cwd": "${workspaceFolder}",
+      "request": "launch",
+      "program": "${workspaceRoot}/.",
+    },
+  ]
+}

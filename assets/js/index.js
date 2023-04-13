@@ -1,7 +1,3 @@
-jQuery('#qrcodeCanvas').qrcode({
-  text: "http://jetienne.com/"
-});
-
 Dropzone.autoDiscover = false;
 
 function getExtention(fname) {
@@ -71,43 +67,43 @@ var vm = new Vue({
       that.preview.filename = null;
 
       var files = this.files.filter(function (f) {
-        if (f.name == 'README.md') {
-          that.preview.filename = f.name;
-        }
+        // if (f.name == 'README.md') {
+        //   that.preview.filename = f.name;
+        // }
         if (!that.showHidden && f.name.slice(0, 1) === '.') {
           return false;
         }
         return true;
       });
       // console.log(this.previewFile)
-      if (this.preview.filename) {
-        var name = this.preview.filename; // For now only README.md
-        console.log(pathJoin([location.pathname, 'README.md']))
-        $.ajax({
-          url: pathJoin([location.pathname, 'README.md']),
-          method: 'GET',
-          success: function (res) {
-            var converter = new showdown.Converter({
-              tables: true,
-              omitExtraWLInCodeBlocks: true,
-              parseImgDimensions: true,
-              simplifiedAutoLink: true,
-              literalMidWordUnderscores: true,
-              tasklists: true,
-              ghCodeBlocks: true,
-              smoothLivePreview: true,
-              simplifiedAutoLink: true,
-              strikethrough: true,
-            });
+      // if (this.preview.filename) {
+      //   var name = this.preview.filename; // For now only README.md
+      //   console.log(pathJoin([location.pathname, 'README.md']))
+      //   $.ajax({
+      //     url: pathJoin([location.pathname, 'README.md']),
+      //     method: 'GET',
+      //     success: function (res) {
+      //       var converter = new showdown.Converter({
+      //         tables: true,
+      //         omitExtraWLInCodeBlocks: true,
+      //         parseImgDimensions: true,
+      //         simplifiedAutoLink: true,
+      //         literalMidWordUnderscores: true,
+      //         tasklists: true,
+      //         ghCodeBlocks: true,
+      //         smoothLivePreview: true,
+      //         simplifiedAutoLink: true,
+      //         strikethrough: true,
+      //       });
 
-            var html = converter.makeHtml(res);
-            that.preview.contentHTML = html;
-          },
-          error: function (err) {
-            console.log(err)
-          }
-        })
-      }
+      //       var html = converter.makeHtml(res);
+      //       that.preview.contentHTML = html;
+      //     },
+      //     error: function (err) {
+      //       console.log(err)
+      //     }
+      //   })
+      // }
 
       return files;
     },
@@ -163,37 +159,10 @@ var vm = new Vue({
       var parentDir = this.parentDirectory(path);
       loadFileOrDir(parentDir);
     },
-    genInstallURL: function (name, noEncode) {
-      var parts = [location.host];
-      var pathname = decodeURI(location.pathname);
-      if (!name) {
-        parts.push(pathname);
-      } else if (getExtention(name) == "ipa") {
-        parts.push("/-/ipa/link", pathname, encodeURIComponent(name));
-      } else {
-        parts.push(pathname, name);
-      }
-      var urlPath = location.protocol + "//" + pathJoin(parts);
-      return noEncode ? urlPath : encodeURI(urlPath);
-    },
-    genQrcode: function (name, title) {
-      var urlPath = this.genInstallURL(name, true);
-      $("#qrcode-title").html(title || name || location.pathname);
-      $("#qrcode-link").attr("href", urlPath);
-      $('#qrcodeCanvas').empty().qrcode({
-        text: encodeURI(urlPath),
-      });
-
-      $("#qrcodeRight a").attr("href", urlPath);
-      $("#qrcode-modal").modal("show");
-    },
     genDownloadURL: function (f) {
       var search = location.search;
       var sep = search == "" ? "?" : "&"
       return location.origin + this.getEncodePath(f.name) + location.search + sep + "download=true";
-    },
-    shouldHaveQrcode: function (name) {
-      return ['apk', 'ipa'].indexOf(getExtention(name)) !== -1;
     },
     genFileClass: function (f) {
       if (f.type == "dir") {
@@ -236,21 +205,27 @@ var vm = new Vue({
       return "fa-file-text-o"
     },
     clickFileOrDir: function (f, e) {
+      parent.postMessage({
+        event: f.type == "dir" ? "dir_selected" : "file_selected",
+        data: {
+          file: f,
+        }
+      }, '*');
       var reqPath = this.getEncodePath(f.name)
-      // TODO: fix here tomorrow
-      if (f.type == "file") {
-        window.location.href = reqPath;
-        return;
-      }
-      loadFileOrDir(reqPath);
+      f.type == "dir" && loadFileOrDir(reqPath);
       e.preventDefault()
     },
     changePath: function (reqPath, e) {
+      parent.postMessage({
+        event: "path_changed",
+        data: {
+          path: reqPath,
+        }
+      }, '*');
       loadFileOrDir(reqPath);
       e.preventDefault()
     },
     showInfo: function (f) {
-      console.log(f);
       $.ajax({
         url: this.getEncodePath(f.name),
         data: {
@@ -270,10 +245,16 @@ var vm = new Vue({
     },
     makeDirectory: function () {
       var name = window.prompt("current path: " + location.pathname + "\nplease enter the new directory name", "")
-      console.log(name)
+      // console.log(name)
       if (!name) {
         return
       }
+      parent.postMessage({
+        event: "dir_created",
+        data: {
+          name: name,
+        }
+      }, '*');
       if(!checkPathNameLegal(name)) {
         alert("Name should not contains any of \\/:*<>|")
         return
@@ -292,6 +273,12 @@ var vm = new Vue({
     },
     deletePathConfirm: function (f, e) {
       e.preventDefault();
+      parent.postMessage({
+        event: "dir_deleted",
+        data: {
+          file: f
+        }
+      }, '*');
       if (!e.altKey) { // skip confirm when alt pressed
         if (!window.confirm("Delete " + f.name + " ?")) {
           return;

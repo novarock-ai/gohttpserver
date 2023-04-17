@@ -1,12 +1,11 @@
-package main
+package common
 
 import "html/template"
 
 var (
 	tmpl      *template.Template
 	templates = map[string]string{
-		"index":       "res/index.tmpl.html",
-		"ipa-install": "res/ipa-install.tmpl.html",
+		"index": "res/index.tmpl.html",
 	}
 )
 

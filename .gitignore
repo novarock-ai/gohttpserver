@@ -33,3 +33,4 @@ assets_vfsdata.go
 dist/
 
 k8s-manifests/*.yaml
+var

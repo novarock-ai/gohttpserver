@@ -1,4 +1,4 @@
-package main
+package auth
 
 import (
 	"encoding/json"
@@ -6,7 +6,7 @@ import (
 	"net/url"
 )
 
-func handleOauth2() {
+func HandleOauth2() {
 	http.HandleFunc("/-/user", func(w http.ResponseWriter, r *http.Request) {
 		fullNameMap, _ := url.ParseQuery(r.Header.Get("X-Auth-Request-Fullname"))
 		var fullName string

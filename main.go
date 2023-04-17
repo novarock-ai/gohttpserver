@@ -18,6 +18,9 @@ import (
 
 	"github.com/alecthomas/kingpin"
 	accesslog "github.com/codeskyblue/go-accesslog"
+	"github.com/codeskyblue/gohttpserver/auth"
+	"github.com/codeskyblue/gohttpserver/common"
+	"github.com/codeskyblue/gohttpserver/server"
 	"github.com/go-yaml/yaml"
 	"github.com/goji/httpauth"
 	"github.com/gorilla/handlers"
@@ -25,23 +28,26 @@ import (
 )
 
 type Configure struct {
-	Conf            *os.File `yaml:"-"`
-	Addr            string   `yaml:"addr"`
-	Port            int      `yaml:"port"`
-	Root            string   `yaml:"root"`
-	Prefix          string   `yaml:"prefix"`
-	HTTPAuth        string   `yaml:"httpauth"`
-	Cert            string   `yaml:"cert"`
-	Key             string   `yaml:"key"`
-	Cors            bool     `yaml:"cors"`
-	Theme           string   `yaml:"theme"`
-	XHeaders        bool     `yaml:"xheaders"`
-	Upload          bool     `yaml:"upload"`
-	Delete          bool     `yaml:"delete"`
-	PlistProxy      string   `yaml:"plistproxy"`
-	Title           string   `yaml:"title"`
-	Debug           bool     `yaml:"debug"`
-	GoogleTrackerID string   `yaml:"google-tracker-id"`
+	Conf            *os.File         `yaml:"-"`
+	Addr            string           `yaml:"addr"`
+	Port            int              `yaml:"port"`
+	Root            string           `yaml:"root"`
+	Prefix          string           `yaml:"prefix"`
+	PrefixReflect   []*regexp.Regexp `yaml:"prefix-reflect"`
+	PinRoot         bool             `yaml:"pin-root"`
+	HTTPAuth        string           `yaml:"httpauth"`
+	Cert            string           `yaml:"cert"`
+	Key             string           `yaml:"key"`
+	Cors            bool             `yaml:"cors"`
+	Theme           string           `yaml:"theme"`
+	XHeaders        bool             `yaml:"xheaders"`
+	Upload          bool             `yaml:"upload"`
+	Delete          bool             `yaml:"delete"`
+	Folder          bool             `yaml:"folder"`
+	PlistProxy      string           `yaml:"plistproxy"`
+	Title           string           `yaml:"title"`
+	Debug           bool             `yaml:"debug"`
+	GoogleTrackerID string           `yaml:"google-tracker-id"`
 	Auth            struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
@@ -58,10 +64,10 @@ func (l httpLogger) Log(record accesslog.LogRecord) {
 }
 
 var (
-	defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
-	defaultOpenID     = "https://login.netease.com/openid"
-	gcfg              = Configure{}
-	logger            = httpLogger{}
+	// defaultPlistProxy = "https://plistproxy.herokuapp.com/plist"
+	// defaultOpenID     = "https://login.netease.com/openid"
+	gcfg   = Configure{}
+	logger = httpLogger{}
 
 	VERSION   = "unknown"
 	BUILDTIME = "unknown time"
@@ -95,8 +101,8 @@ func parseFlags() error {
 	gcfg.Port = 8000
 	gcfg.Addr = ""
 	gcfg.Theme = "black"
-	gcfg.PlistProxy = defaultPlistProxy
-	gcfg.Auth.OpenID = defaultOpenID
+	// gcfg.PlistProxy = defaultPlistProxy
+	// gcfg.Auth.OpenID = defaultOpenID
 	gcfg.GoogleTrackerID = "UA-81205425-2"
 	gcfg.Title = "Go HTTP File Server"
 
@@ -105,6 +111,8 @@ func parseFlags() error {
 	kingpin.Flag("conf", "config file path, yaml format").FileVar(&gcfg.Conf)
 	kingpin.Flag("root", "root directory, default ./").Short('r').StringVar(&gcfg.Root)
 	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
+	kingpin.Flag("prefix-reflect", "url prefix reflect, eg /foo/bar will be reflected to /").RegexpListVar(&gcfg.PrefixReflect)
+	kingpin.Flag("pin-root", "pin root directory, default false").BoolVar(&gcfg.PinRoot)
 	kingpin.Flag("port", "listen port, default 8000").IntVar(&gcfg.Port)
 	kingpin.Flag("addr", "listen address, eg 127.0.0.1:8000").Short('a').StringVar(&gcfg.Addr)
 	kingpin.Flag("cert", "tls cert.pem path").StringVar(&gcfg.Cert)
@@ -115,6 +123,7 @@ func parseFlags() error {
 	kingpin.Flag("theme", "web theme, one of <black|green>").StringVar(&gcfg.Theme)
 	kingpin.Flag("upload", "enable upload support").BoolVar(&gcfg.Upload)
 	kingpin.Flag("delete", "enable delete support").BoolVar(&gcfg.Delete)
+	kingpin.Flag("folder", "enable folder support").BoolVar(&gcfg.Folder)
 	kingpin.Flag("xheaders", "used when behide nginx").BoolVar(&gcfg.XHeaders)
 	kingpin.Flag("cors", "enable cross-site HTTP request").BoolVar(&gcfg.Cors)
 	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
@@ -164,13 +173,18 @@ func main() {
 		log.Printf("url prefix: %s", gcfg.Prefix)
 	}
 
-	ss := NewHTTPStaticServer(gcfg.Root)
+	// fmt.Println(gcfg.PrefixReflect[0].String())
+
+	ss := server.NewHTTPStaticServer(gcfg.Root)
 	ss.Prefix = gcfg.Prefix
+	ss.PrefixReflect = gcfg.PrefixReflect
+	ss.PinRoot = gcfg.PinRoot
 	ss.Theme = gcfg.Theme
 	ss.Title = gcfg.Title
 	ss.GoogleTrackerID = gcfg.GoogleTrackerID
 	ss.Upload = gcfg.Upload
 	ss.Delete = gcfg.Delete
+	ss.Folder = gcfg.Folder
 	ss.AuthType = gcfg.Auth.Type
 
 	if gcfg.PlistProxy != "" {
@@ -198,11 +212,11 @@ func main() {
 			hdlr = httpauth.SimpleBasicAuth(user, pass)(hdlr)
 		}
 	case "openid":
-		handleOpenID(gcfg.Auth.OpenID, false) // FIXME(ssx): set secure default to false
+		auth.HandleOpenID(gcfg.Auth.OpenID, false) // FIXME(ssx): set secure default to false
 		// case "github":
 		// 	handleOAuth2ID(gcfg.Auth.Type, gcfg.Auth.ID, gcfg.Auth.Secret) // FIXME(ssx): set secure default to false
 	case "oauth2-proxy":
-		handleOauth2()
+		auth.HandleOauth2()
 	}
 
 	// CORS
@@ -223,7 +237,7 @@ func main() {
 		})
 	}
 
-	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(gcfg.Prefix+"/-/", http.FileServer(Assets)))
+	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(gcfg.Prefix+"/-/", http.FileServer(common.Assets)))
 	router.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {
 		data, _ := json.Marshal(map[string]interface{}{
 			"version": VERSION,
@@ -241,7 +255,7 @@ func main() {
 		gcfg.Addr = ":" + gcfg.Addr
 	}
 	_, port, _ := net.SplitHostPort(gcfg.Addr)
-	log.Printf("listening on %s, local address http://%s:%s\n", strconv.Quote(gcfg.Addr), getLocalIP(), port)
+	log.Printf("listening on %s, local address http://%s:%s\n", strconv.Quote(gcfg.Addr), common.GetLocalIP(), port)
 
 	srv := &http.Server{
 		Handler: mainRouter,

@@ -12,7 +12,7 @@ function pathJoin(parts, sep) {
 
 function getQueryString(name) {
   var reg = new RegExp("(^|&)" + name + "=([^&]*)(&|$)");
-  var r = decodeURI(window.location.search).substr(1).match(reg);
+  var r = decodeURIComponent(window.location.search).substr(1).match(reg);
   if (r != null) return r[2].replace(/\+/g, ' ');
   return null;
 }
@@ -39,6 +39,7 @@ var vm = new Vue({
       email: "",
       name: "",
     },
+    homepage: "/",
     location: window.location,
     breadcrumb: [],
     showHidden: false,
@@ -67,44 +68,11 @@ var vm = new Vue({
       that.preview.filename = null;
 
       var files = this.files.filter(function (f) {
-        // if (f.name == 'README.md') {
-        //   that.preview.filename = f.name;
-        // }
         if (!that.showHidden && f.name.slice(0, 1) === '.') {
           return false;
         }
         return true;
       });
-      // console.log(this.previewFile)
-      // if (this.preview.filename) {
-      //   var name = this.preview.filename; // For now only README.md
-      //   console.log(pathJoin([location.pathname, 'README.md']))
-      //   $.ajax({
-      //     url: pathJoin([location.pathname, 'README.md']),
-      //     method: 'GET',
-      //     success: function (res) {
-      //       var converter = new showdown.Converter({
-      //         tables: true,
-      //         omitExtraWLInCodeBlocks: true,
-      //         parseImgDimensions: true,
-      //         simplifiedAutoLink: true,
-      //         literalMidWordUnderscores: true,
-      //         tasklists: true,
-      //         ghCodeBlocks: true,
-      //         smoothLivePreview: true,
-      //         simplifiedAutoLink: true,
-      //         strikethrough: true,
-      //       });
-
-      //       var html = converter.makeHtml(res);
-      //       that.preview.contentHTML = html;
-      //     },
-      //     error: function (err) {
-      //       console.log(err)
-      //     }
-      //   })
-      // }
-
       return files;
     },
   },
@@ -122,7 +90,7 @@ var vm = new Vue({
     })
     this.myDropzone = new Dropzone("#upload-form", {
       paramName: "file",
-      maxFilesize: 10240,
+      maxFilesize: 102400,
       addRemoveLinks: true,
       init: function () {
         this.on("uploadprogress", function (file, progress) {
@@ -136,8 +104,11 @@ var vm = new Vue({
     });
   },
   methods: {
+    getLocationPathname: function () {
+      return decodeURIComponent(location.pathname);
+    },
     getEncodePath: function (filepath) {
-      return pathJoin([location.pathname].concat(filepath.split("/").map(v => encodeURIComponent(v))))
+      return pathJoin([this.getLocationPathname()].concat(filepath.split("/").map(v => encodeURIComponent(v))))
     },
     formatTime: function (timestamp) {
       var m = moment(timestamp);
@@ -225,6 +196,18 @@ var vm = new Vue({
       loadFileOrDir(reqPath);
       e.preventDefault()
     },
+    backOnePath: function (e) {
+      const currentPath = this.getLocationPathname().replace(/\/+$/, "");
+      const homepage = this.homepage.replace(/\/+$/, "");
+      if (currentPath === homepage) {
+        return
+      }
+      const reqPath = this.parentDirectory(this.getLocationPathname()).replace(/\/+$/, "");
+      if (reqPath.length < homepage.length) {
+        return;
+      }
+      this.changePath(reqPath, e);
+    },
     showInfo: function (f) {
       $.ajax({
         url: this.getEncodePath(f.name),
@@ -244,7 +227,7 @@ var vm = new Vue({
       })
     },
     makeDirectory: function () {
-      var name = window.prompt("current path: " + location.pathname + "\nplease enter the new directory name", "")
+      var name = window.prompt("current path: " + this.getLocationPathname() + "\nplease enter the new directory name", "")
       // console.log(name)
       if (!name) {
         return
@@ -263,7 +246,7 @@ var vm = new Vue({
         url: this.getEncodePath(name),
         method: "POST",
         success: function (res) {
-          console.log(res)
+          // console.log(res)
           loadFileList()
         },
         error: function (jqXHR, textStatus, errorThrown) {
@@ -296,7 +279,7 @@ var vm = new Vue({
       });
     },
     updateBreadcrumb: function (pathname) {
-      var pathname = decodeURI(pathname || location.pathname || "/");
+      var pathname = decodeURIComponent(pathname || this.getLocationPathname() || "/");
       pathname = pathname.split('?')[0]
       var parts = pathname.split('/');
       this.breadcrumb = [];
@@ -322,9 +305,9 @@ var vm = new Vue({
         e.preventDefault() // may be need a switch
       }
       var that = this;
-      $.getJSON(pathJoin(['/-/info', location.pathname]))
+      $.getJSON(pathJoin(['/-/info', this.getLocationPathname()]))
           .then(function (res) {
-            console.log(res);
+            // console.log(res);
             that.preview.filename = res.name;
             that.preview.filesize = res.size;
             return $.ajax({
@@ -333,12 +316,12 @@ var vm = new Vue({
             });
           })
           .then(function (res) {
-            console.log(res)
+            // console.log(res)
             that.preview.contentHTML = '<pre>' + res + '</pre>';
-            console.log("Finally")
+            // console.log("Finally")
           })
           .done(function (res) {
-            console.log("done", res)
+            // console.log("done", res)
           });
     },
     loadAll: function () {
@@ -356,8 +339,8 @@ window.onpopstate = function (event) {
 }
 
 function loadFileOrDir(reqPath) {
-  let requestUri = reqPath + location.search
-  var retObj = loadFileList(requestUri)
+  const requestUri = (reqPath || "/") + location.search
+  const retObj = loadFileList(requestUri)
   if (retObj !== null) {
     retObj.done(function () {
       window.history.pushState({}, "", requestUri);
@@ -367,14 +350,18 @@ function loadFileOrDir(reqPath) {
 }
 
 function loadFileList(pathname) {
-  var pathname = pathname || location.pathname + location.search;
+  var pathname = pathname || decodeURIComponent(location.pathname) + location.search;
   var retObj = null
+  // TODO: rewrite the type of raw
   if (getQueryString("raw") !== "false") { // not a file preview
     var sep = pathname.indexOf("?") === -1 ? "?" : "&"
     retObj = $.ajax({
       url: pathname + sep + "json=true",
       dataType: "json",
       cache: false,
+      headers: {
+        "X-Requested-Root-Token": (window.token || "")
+      },
       success: function (res) {
         res.files = _.sortBy(res.files, function (f) {
           var weight = f.type == 'dir' ? 1000 : 1;
@@ -382,6 +369,28 @@ function loadFileList(pathname) {
         })
         vm.files = res.files;
         vm.auth = res.auth;
+        const configs = res.configs;
+        prefixReflect = configs?.prefixReflect;
+        pathname = decodeURIComponent(pathname)
+        if (prefixReflect && prefixReflect.length > 0) {
+          for (let i = 0; i < prefixReflect.length; i++) {
+            if (pathname.startsWith(prefixReflect[i])) {
+              vm.homepage = prefixReflect[i].startsWith('/') ? prefixReflect[i] : '/' + prefixReflect[i];
+              pathname = pathname.replace(prefixReflect[i], '')
+              break;
+            }
+            re = new RegExp(prefixReflect[i])
+            res = pathname.match(re)
+            if (res) {
+              vm.homepage = res[0].startsWith('/') ? res[0] : '/' + res[0]
+              pathname = pathname.replace(re, '')
+              break;
+            }
+          }
+          if (!pathname.startsWith('/')) {
+            pathname = '/' + pathname
+          }
+        }
         vm.updateBreadcrumb(pathname);
       },
       error: function (jqXHR, textStatus, errorThrown) {
@@ -391,10 +400,10 @@ function loadFileList(pathname) {
 
   }
 
-  vm.previewMode = getQueryString("raw") == "false";
-  if (vm.previewMode) {
-    vm.loadPreviewFile();
-  }
+  // vm.previewMode = getQueryString("raw") == "false";
+  // if (vm.previewMode) {
+  //   vm.loadPreviewFile();
+  // }
   return retObj
 }
 
@@ -417,7 +426,7 @@ $(function () {
   });
 
   // For page first loading
-  loadFileList(location.pathname + location.search)
+  loadFileList(decodeURIComponent(location.pathname) + location.search)
 
   // update version
   $.getJSON("/-/sysinfo", function (res) {

@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"archive/zip"
@@ -21,7 +21,7 @@ type Zip struct {
 	*zip.Writer
 }
 
-func sanitizedName(filename string) string {
+func SanitizedName(filename string) string {
 	if len(filename) > 1 && filename[1] == ':' &&
 		runtime.GOOS == "windows" {
 		filename = filename[2:]
@@ -32,7 +32,7 @@ func sanitizedName(filename string) string {
 	return filename
 }
 
-func statFile(filename string) (info os.FileInfo, reader io.ReadCloser, err error) {
+func StatFile(filename string) (info os.FileInfo, reader io.ReadCloser, err error) {
 	info, err = os.Lstat(filename)
 	if err != nil {
 		return
@@ -57,7 +57,7 @@ func statFile(filename string) (info os.FileInfo, reader io.ReadCloser, err erro
 }
 
 func (z *Zip) Add(relpath, abspath string) error {
-	info, rdc, err := statFile(abspath)
+	info, rdc, err := StatFile(abspath)
 	if err != nil {
 		return err
 	}
@@ -67,7 +67,7 @@ func (z *Zip) Add(relpath, abspath string) error {
 	if err != nil {
 		return err
 	}
-	hdr.Name = sanitizedName(relpath)
+	hdr.Name = SanitizedName(relpath)
 	if info.IsDir() {
 		hdr.Name += "/"
 	}
@@ -132,7 +132,7 @@ func ExtractFromZip(zipFile, path string, w io.Writer) (err error) {
 	return fmt.Errorf("File %s not found", strconv.Quote(path))
 }
 
-func unzipFile(filename, dest string) error {
+func UnzipFile(filename, dest string) error {
 	zr, err := zip.OpenReader(filename)
 	if err != nil {
 		return err
@@ -151,7 +151,7 @@ func unzipFile(filename, dest string) error {
 		defer rc.Close()
 
 		// ignore .ghs.yml
-		filename := sanitizedName(f.Name)
+		filename := SanitizedName(f.Name)
 		if filepath.Base(filename) == ".ghs.yml" {
 			continue
 		}

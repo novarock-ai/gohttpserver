@@ -1,4 +1,4 @@
-package main
+package common
 
 import (
 	"net"
@@ -24,7 +24,7 @@ import (
 // 	return ""
 // }
 
-func getRealIP(req *http.Request) string {
+func GetRealIP(req *http.Request) string {
 	xip := req.Header.Get("X-Real-IP")
 	if xip == "" {
 		xip = strings.Split(req.RemoteAddr, ":")[0]
@@ -58,7 +58,7 @@ func SublimeContains(s, substr string) bool {
 }
 
 // getLocalIP returns the non loopback local IP of the host
-func getLocalIP() string {
+func GetLocalIP() string {
 	addrs, err := net.InterfaceAddrs()
 	if err != nil {
 		return ""
@@ -74,7 +74,7 @@ func getLocalIP() string {
 	return ""
 }
 
-func fileExists(path string) bool {
+func FileExists(path string) bool {
 	info, err := os.Stat(path)
 	if err != nil {
 		return false
@@ -83,16 +83,16 @@ func fileExists(path string) bool {
 }
 
 // Convert path to normal paths
-func cleanPath(path string) string {
+func CleanPath(path string) string {
 	return filepath.ToSlash(filepath.Clean(path))
 }
 
-func isFile(path string) bool {
+func IsFile(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsRegular()
 }
 
-func isDir(path string) bool {
+func IsDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsDir()
 }

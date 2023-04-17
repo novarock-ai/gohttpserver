@@ -1,4 +1,4 @@
-package main
+package auth
 
 import (
 	"encoding/gob"
@@ -13,10 +13,10 @@ import (
 )
 
 var (
-	nonceStore         = openid.NewSimpleNonceStore()
-	discoveryCache     = openid.NewSimpleDiscoveryCache()
-	store              = sessions.NewCookieStore([]byte("something-very-secret"))
-	defaultSessionName = "ghs-session"
+	NonceStore         = openid.NewSimpleNonceStore()
+	DiscoveryCache     = openid.NewSimpleDiscoveryCache()
+	Store              = sessions.NewCookieStore([]byte("something-very-secret"))
+	DefaultSessionName = "ghs-session"
 )
 
 type UserInfo struct {
@@ -33,7 +33,7 @@ func init() {
 	gob.Register(&M{})
 }
 
-func handleOpenID(loginUrl string, secure bool) {
+func HandleOpenID(loginUrl string, secure bool) {
 	http.HandleFunc("/-/login", func(w http.ResponseWriter, r *http.Request) {
 		nextUrl := r.FormValue("next")
 		referer := r.Referer()
@@ -47,19 +47,19 @@ func handleOpenID(loginUrl string, secure bool) {
 		log.Println("Scheme:", scheme)
 		if url, err := openid.RedirectURL(loginUrl,
 			scheme+"://"+r.Host+"/-/openidcallback?next="+nextUrl, ""); err == nil {
-			http.Redirect(w, r, url, 303)
+			http.Redirect(w, r, url, http.StatusSeeOther)
 		} else {
 			log.Println("Should not got error here:", err)
 		}
 	})
 
 	http.HandleFunc("/-/openidcallback", func(w http.ResponseWriter, r *http.Request) {
-		id, err := openid.Verify("http://"+r.Host+r.URL.String(), discoveryCache, nonceStore)
+		id, err := openid.Verify("http://"+r.Host+r.URL.String(), DiscoveryCache, NonceStore)
 		if err != nil {
 			io.WriteString(w, "Authentication check failed.")
 			return
 		}
-		session, err := store.Get(r, defaultSessionName)
+		session, err := Store.Get(r, DefaultSessionName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -79,11 +79,11 @@ func handleOpenID(loginUrl string, secure bool) {
 		if nextUrl == "" {
 			nextUrl = "/"
 		}
-		http.Redirect(w, r, nextUrl, 302)
+		http.Redirect(w, r, nextUrl, http.StatusFound)
 	})
 
 	http.HandleFunc("/-/user", func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, defaultSessionName)
+		session, err := Store.Get(r, DefaultSessionName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -95,7 +95,7 @@ func handleOpenID(loginUrl string, secure bool) {
 	})
 
 	http.HandleFunc("/-/logout", func(w http.ResponseWriter, r *http.Request) {
-		session, err := store.Get(r, defaultSessionName)
+		session, err := Store.Get(r, DefaultSessionName)
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
@@ -107,6 +107,6 @@ func handleOpenID(loginUrl string, secure bool) {
 		if nextUrl == "" {
 			nextUrl = r.Referer()
 		}
-		http.Redirect(w, r, nextUrl, 302)
+		http.Redirect(w, r, nextUrl, http.StatusFound)
 	})
 }

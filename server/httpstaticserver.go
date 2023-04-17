@@ -1,20 +1,14 @@
-package main
+package server
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
 	"io"
 	"io/fs"
-
-	// "io/ioutil"
-
-	// "io/ioutil"
 	"log"
 	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -24,12 +18,14 @@ import (
 
 	"regexp"
 
+	"github.com/codeskyblue/gohttpserver/auth"
+	"github.com/codeskyblue/gohttpserver/common"
+	"github.com/codeskyblue/gohttpserver/secret"
+	"github.com/dgrijalva/jwt-go"
 	"github.com/go-yaml/yaml"
 	"github.com/gorilla/mux"
 	"github.com/shogo82148/androidbinary/apk"
 )
-
-const YAMLCONF = ".ghs.yml"
 
 type ApkInfo struct {
 	PackageName  string `json:"packageName"`
@@ -54,8 +50,12 @@ type Directory struct {
 type HTTPStaticServer struct {
 	Root            string
 	Prefix          string
+	PrefixReflect   []*regexp.Regexp
+	PinRoot         bool
+	Token           string
 	Upload          bool
 	Delete          bool
+	Folder          bool
 	Title           string
 	Theme           string
 	PlistProxy      string
@@ -68,11 +68,6 @@ type HTTPStaticServer struct {
 }
 
 func NewHTTPStaticServer(root string) *HTTPStaticServer {
-	fmt.Println("这里的 root: ", root)
-	// if root == "" {
-	// 	root = "./"
-	// }
-	// root = filepath.ToSlash(root)
 	root = filepath.ToSlash(filepath.Clean(root))
 	if !strings.HasSuffix(root, "/") {
 		root = root + "/"
@@ -100,10 +95,6 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 		}
 	}()
 
-	// routers for Apple *.ipa
-	m.HandleFunc("/-/ipa/plist/{path:.*}", s.hPlist)
-	m.HandleFunc("/-/ipa/link/{path:.*}", s.hIpaLink)
-
 	m.HandleFunc("/{path:.*}", s.hIndex).Methods("GET", "HEAD")
 	m.HandleFunc("/{path:.*}", s.hUploadOrMkdir).Methods("POST")
 	m.HandleFunc("/{path:.*}", s.hDelete).Methods("DELETE")
@@ -112,6 +103,20 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 
 func (s *HTTPStaticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	s.m.ServeHTTP(w, r)
+}
+
+func startsWith(s, prefix string) bool {
+	if len(s) < len(prefix) {
+		return false
+	}
+	return s[:len(prefix)] == prefix
+}
+
+func endsWith(s, suffix string) bool {
+	if len(s) < len(suffix) {
+		return false
+	}
+	return s[len(s)-len(suffix):] == suffix
 }
 
 // Return real path with Seperator(/)
@@ -129,11 +134,55 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 	return filepath.ToSlash(realPath)
 }
 
+func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, path string) (isok bool, root string) {
+	// token := r.FormValue("token")
+	token := r.Header.Get("X-Requested-Root-Token")
+
+	if s.PinRoot {
+		if token == "" {
+			w.WriteHeader(http.StatusForbidden)
+			return false, ""
+		}
+		publicKeyPath := "./var/secret/public.pem"
+		claims, err := secret.ParseJWT(publicKeyPath, token)
+		if err != nil {
+			fmt.Println("err: ", err)
+			w.WriteHeader(http.StatusForbidden)
+			return false, ""
+		}
+
+		root = claims["root"].(string)
+
+		if !startsWith(path, root) {
+			queryParams := r.URL.Query()
+			http.Redirect(w, r, "/"+root+"?"+queryParams.Encode(), http.StatusFound)
+			return false, ""
+		}
+	}
+	return true, root
+}
+
 func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
-	// fmt.Println("这里的 path 是: ", mux.Vars(r)["path"])
 	path := mux.Vars(r)["path"]
+
 	realPath := s.getRealPath(r)
 	if r.FormValue("json") == "true" {
+		ok, root := s.checkToken(w, r, path)
+		if !ok {
+			return
+		}
+		if !startsWith(root, "/") {
+			root = "/" + root
+		}
+
+		if endsWith(root, "/") {
+			root = root[:len(root)-1]
+		}
+
+		if s.PinRoot {
+			re, _ := regexp.Compile(root)
+			s.PrefixReflect = []*regexp.Regexp{re}
+		}
 		s.hJSONList(w, r)
 		return
 	}
@@ -149,13 +198,42 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("GET", path, realPath)
-	if r.FormValue("raw") == "false" || isDir(realPath) {
+	// r.URL.Path
+	if r.FormValue("raw") == "false" || common.IsDir(realPath) {
 		if r.Method == "HEAD" {
 			return
 		}
+
+		if s.PinRoot {
+			secretPath := "./var/secret"
+			privatePath := "./var/secret/private.pem"
+			_, err := os.Lstat(privatePath)
+
+			if err != nil {
+				_, privatePath, err = secret.CreatePEM(secretPath)
+				if err != nil {
+					log.Println("create pem error: ", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+			}
+
+			token, err := secret.CreateJWT(privatePath, jwt.MapClaims{
+				"root": path,
+			})
+			if err != nil {
+				log.Println("create jwt error: ", err)
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			s.Token = token
+			renderHTML(w, "assets/index.html", s)
+			return
+		}
+
 		renderHTML(w, "assets/index.html", s)
 	} else {
-		if filepath.Base(path) == YAMLCONF {
+		if filepath.Base(path) == common.YAMLCONF {
 			auth := s.readAccessConf(realPath)
 			if !auth.Delete {
 				http.Error(w, "Security warning, not allowed to read", http.StatusForbidden)
@@ -263,9 +341,9 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 
 	// Note: very large size file might cause poor performance
 	// _, copyErr = io.Copy(dst, file)
-	buf := s.bufPool.Get().(*[]byte)
+	buf := s.bufPool.Get().([]byte)
 	defer s.bufPool.Put(&buf)
-	_, copyErr = io.CopyBuffer(dst, file, *buf)
+	_, copyErr = io.CopyBuffer(dst, file, buf)
 	dst.Close()
 	// }
 	if copyErr != nil {
@@ -277,7 +355,7 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 	w.Header().Set("Content-Type", "application/json;charset=utf-8")
 
 	if req.FormValue("unzip") == "true" {
-		err = unzipFile(dstPath, dirpath)
+		err = common.UnzipFile(dstPath, dirpath)
 		os.Remove(dstPath)
 		message := "success"
 		if err != nil {
@@ -357,7 +435,7 @@ func (s *HTTPStaticServer) hInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *HTTPStaticServer) hZip(w http.ResponseWriter, r *http.Request) {
-	CompressToZip(w, s.getRealPath(r))
+	common.CompressToZip(w, s.getRealPath(r))
 }
 
 // func (s *HTTPStaticServer) hUnzip(w http.ResponseWriter, r *http.Request) {
@@ -374,99 +452,13 @@ func (s *HTTPStaticServer) hZip(w http.ResponseWriter, r *http.Request) {
 // 	}
 // }
 
-func combineURL(r *http.Request, path string) *url.URL {
-	return &url.URL{
-		Scheme: r.URL.Scheme,
-		Host:   r.Host,
-		Path:   path,
-	}
-}
-
-func (s *HTTPStaticServer) hPlist(w http.ResponseWriter, r *http.Request) {
-	path := mux.Vars(r)["path"]
-	// rename *.plist to *.ipa
-	if filepath.Ext(path) == ".plist" {
-		path = path[0:len(path)-6] + ".ipa"
-	}
-
-	relPath := s.getRealPath(r)
-	plinfo, err := parseIPA(relPath)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-
-	scheme := "http"
-	if r.TLS != nil {
-		scheme = "https"
-	}
-	baseURL := &url.URL{
-		Scheme: scheme,
-		Host:   r.Host,
-	}
-	data, err := generateDownloadPlist(baseURL, path, plinfo)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	w.Header().Set("Content-Type", "text/xml")
-	w.Write(data)
-}
-
-func (s *HTTPStaticServer) hIpaLink(w http.ResponseWriter, r *http.Request) {
-	path := mux.Vars(r)["path"]
-	var plistUrl string
-
-	if r.URL.Scheme == "https" {
-		plistUrl = combineURL(r, "/-/ipa/plist/"+path).String()
-	} else if s.PlistProxy != "" {
-		httpPlistLink := "http://" + r.Host + "/-/ipa/plist/" + path
-		url, err := s.genPlistLink(httpPlistLink)
-		if err != nil {
-			http.Error(w, err.Error(), 500)
-			return
-		}
-		plistUrl = url
-	} else {
-		http.Error(w, "500: Server should be https:// or provide valid plistproxy", 500)
-		return
-	}
-
-	w.Header().Set("Content-Type", "text/html")
-	log.Println("PlistURL:", plistUrl)
-	renderHTML(w, "assets/ipa-install.html", map[string]string{
-		"Name":      filepath.Base(path),
-		"PlistLink": plistUrl,
-	})
-}
-
-func (s *HTTPStaticServer) genPlistLink(httpPlistLink string) (plistUrl string, err error) {
-	// Maybe need a proxy, a little slowly now.
-	pp := s.PlistProxy
-	if pp == "" {
-		pp = defaultPlistProxy
-	}
-	resp, err := http.Get(httpPlistLink)
-	if err != nil {
-		return
-	}
-	defer resp.Body.Close()
-
-	data, _ := io.ReadAll(resp.Body)
-	retData, err := http.Post(pp, "text/xml", bytes.NewBuffer(data))
-	if err != nil {
-		return
-	}
-	defer retData.Body.Close()
-
-	jsonData, _ := io.ReadAll(retData.Body)
-	var ret map[string]string
-	if err = json.Unmarshal(jsonData, &ret); err != nil {
-		return
-	}
-	plistUrl = pp + "/" + ret["key"]
-	return
-}
+// func combineURL(r *http.Request, path string) *url.URL {
+// 	return &url.URL{
+// 		Scheme: r.URL.Scheme,
+// 		Host:   r.Host,
+// 		Path:   path,
+// 	}
+// }
 
 // func (s *HTTPStaticServer) hFileOrDirectory(w http.ResponseWriter, r *http.Request) {
 // 	http.ServeFile(w, r, s.getRealPath(r))
@@ -490,12 +482,14 @@ type UserControl struct {
 	// Access bool
 	Upload bool
 	Delete bool
+	Folder bool
 	Token  string
 }
 
 type AccessConf struct {
 	Upload       bool          `yaml:"upload" json:"upload"`
 	Delete       bool          `yaml:"delete" json:"delete"`
+	Folder       bool          `yaml:"folder" json:"folder"`
 	Users        []UserControl `yaml:"users" json:"users"`
 	AccessTables []AccessTable `yaml:"accessTables"`
 }
@@ -521,7 +515,7 @@ func (c *AccessConf) canAccess(fileName string) bool {
 }
 
 func (c *AccessConf) canDelete(r *http.Request) bool {
-	session, err := store.Get(r, defaultSessionName)
+	session, err := auth.Store.Get(r, auth.DefaultSessionName)
 	if err != nil {
 		return c.Delete
 	}
@@ -529,13 +523,31 @@ func (c *AccessConf) canDelete(r *http.Request) bool {
 	if val == nil {
 		return c.Delete
 	}
-	userInfo := val.(*UserInfo)
+	userInfo := val.(*auth.UserInfo)
 	for _, rule := range c.Users {
 		if rule.Email == userInfo.Email {
 			return rule.Delete
 		}
 	}
 	return c.Delete
+}
+
+func (c *AccessConf) canNewFolder(r *http.Request) bool {
+	session, err := auth.Store.Get(r, auth.DefaultSessionName)
+	if err != nil {
+		return c.Folder
+	}
+	val := session.Values["user"]
+	if val == nil {
+		return c.Folder
+	}
+	userInfo := val.(*auth.UserInfo)
+	for _, rule := range c.Users {
+		if rule.Email == userInfo.Email {
+			return rule.Folder
+		}
+	}
+	return c.Folder
 }
 
 func (c *AccessConf) canUploadByToken(token string) bool {
@@ -552,7 +564,7 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 	if token != "" {
 		return c.canUploadByToken(token)
 	}
-	session, err := store.Get(r, defaultSessionName)
+	session, err := auth.Store.Get(r, auth.DefaultSessionName)
 	if err != nil {
 		return c.Upload
 	}
@@ -560,7 +572,7 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 	if val == nil {
 		return c.Upload
 	}
-	userInfo := val.(*UserInfo)
+	userInfo := val.(*auth.UserInfo)
 
 	for _, rule := range c.Users {
 		if rule.Email == userInfo.Email {
@@ -570,6 +582,10 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 	return c.Upload
 }
 
+type ResponseConfigs struct {
+	PrefixReflect []string `json:"prefixReflect"`
+}
+
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
 	realPath := s.getRealPath(r)
@@ -577,6 +593,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	auth := s.readAccessConf(realPath)
 	auth.Upload = auth.canUpload(r)
 	auth.Delete = auth.canDelete(r)
+	auth.Folder = auth.canNewFolder(r)
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
@@ -633,8 +650,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Type = "file"
 			lr.Size = info.Size() // formatSize(info)
 		}
-		// lr.Type = "file"
-		// lr.Size = info.Size() // formatSize(info)
 		lrs = append(lrs, lr)
 	}
 
@@ -669,17 +684,20 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Type = "file"
 			lr.Size = _info.Size() // formatSize(info)
 		}
-		// name := deepPath(realPath, info.Name())
-		// lr.Name = name
-		// lr.Path = filepath.Join(filepath.Dir(path), name)
-		// lr.Type = "dir"
-		// lr.Size = s.historyDirSize(lr.Path)
 		lrs = append(lrs, lr)
+	}
+
+	prefixReflects := make([]string, len(s.PrefixReflect))
+	for i, re := range s.PrefixReflect {
+		prefixReflects[i] = re.String()
 	}
 
 	data, _ := json.Marshal(map[string]interface{}{
 		"files": lrs,
 		"auth":  auth,
+		"configs": ResponseConfigs{
+			PrefixReflect: prefixReflects,
+		},
 	})
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
@@ -760,6 +778,7 @@ func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
 	return AccessConf{
 		Upload: s.Upload,
 		Delete: s.Delete,
+		Folder: s.Folder,
 	}
 }
 
@@ -772,10 +791,10 @@ func (s *HTTPStaticServer) readAccessConf(realPath string) (ac AccessConf) {
 		parentPath := filepath.Dir(realPath)
 		ac = s.readAccessConf(parentPath)
 	}
-	if isFile(realPath) {
+	if common.IsFile(realPath) {
 		realPath = filepath.Dir(realPath)
 	}
-	cfgFile := filepath.Join(realPath, YAMLCONF)
+	cfgFile := filepath.Join(realPath, common.YAMLCONF)
 	data, err := os.ReadFile(cfgFile)
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -808,7 +827,7 @@ func deepPath(basedir, name string) string {
 }
 
 func assetsContent(name string) string {
-	fd, err := Assets.Open(name)
+	fd, err := common.Assets.Open(name)
 	if err != nil {
 		panic(err)
 	}
@@ -828,7 +847,7 @@ func init() {
 	funcMap = template.FuncMap{
 		"title": strings.ToTitle,
 		"urlhash": func(path string) string {
-			httpFile, err := Assets.Open(path)
+			httpFile, err := common.Assets.Open(path)
 			if err != nil {
 				return path + "#no-such-file"
 			}
@@ -854,6 +873,16 @@ func renderHTML(w http.ResponseWriter, name string, v interface{}) {
 	_tmpls[name] = t
 	t.Execute(w, v)
 }
+
+// func renderHTMLWithToken(w http.ResponseWriter, name string, v interface{}) {
+// 	if t, ok := _tmpls[name]; ok {
+// 		t.Execute(w, v)
+// 		return
+// 	}
+// 	t := template.Must(template.New(name).Funcs(funcMap).Delims("[[", "]]").Parse(assetsContent(name)))
+// 	_tmpls[name] = t
+// 	t.Execute(w, v)
+// }
 
 func checkFilename(name string) error {
 	if strings.ContainsAny(name, "\\/:*<>|") {

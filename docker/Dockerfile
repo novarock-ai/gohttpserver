@@ -9,4 +9,4 @@ WORKDIR /app
 COPY assets .
 COPY --from=builder /app/gohttpserver/gohttpserver .
 EXPOSE 9999
-ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999" ]
+ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root"]

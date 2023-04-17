@@ -15,8 +15,6 @@
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/style.css">
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/themes/[[.Theme]].css">
 </head>
-<!-- 
-<script src="[[.Prefix]]/-/assets/js/iframeResizer.min.js"></script> -->
 
 <script src="[[.Prefix]]/-/assets/js/iframeResizer.contentWindow.min.js"></script>
 
@@ -26,10 +24,10 @@
       <div style="position:sticky;top:0;z-index:999;background-color:#fff">
         <ol class="breadcrumb">
           <li>
-            <a v-on:click='changePath("/", $event)' href="/"><i class="fa fa-home"></i></a>
+            <a v-on:click='changePath(homepage, $event)' href="/"><i class="fa fa-home"></i></a>
           </li>
           <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
-            <a v-on:click='changePath(bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
+            <a v-on:click='changePath(homepage + "/" + bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
           </li>
           <li v-if="breadcrumb.length >= 1">
             {{breadcrumb.slice(-1)[0].name}}
@@ -39,7 +37,8 @@
           <tr>
             <td colspan=4>
               <div style="float:left">
-                <button class="btn btn-xs btn-default" onclick="history.back()">
+                <!-- <button class="btn btn-xs btn-default" onclick="history.back()"> -->
+                <button class="btn btn-xs btn-default" v-on:click="backOnePath($event)">
                   Back <i class="fa fa-arrow-left"></i>
                 </button>
                 <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
@@ -48,7 +47,7 @@
                 <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal">
                   Upload <i class="fa fa-upload"></i>
                 </button>
-                <button class="btn btn-xs btn-default" v-show="auth.delete" @click="makeDirectory">
+                <button class="btn btn-xs btn-default" v-show="auth.folder" @click="makeDirectory">
                   New Folder <i class="fa fa-folder"></i>
                 </button>
               </div>
@@ -66,14 +65,6 @@
               </div>
             </td>
           </tr>
-          <!-- <tr>
-            <th>Name</th>
-            <th>Size</th>
-            <th class="hidden-xs">
-              <span style="cursor: pointer" v-on:click='mtimeTypeFromNow = !mtimeTypeFromNow'>ModTime</span>
-            </th>
-            <th>Actions</th>
-          </tr> -->
         </div>
       </div>
       <table class="table table-hover" v-if="!previewMode">
@@ -173,15 +164,15 @@
         </div>
       </div>
     </div>
-    <!-- <div class="col-md-12">
-      <div id="footer" class="pull-right" style="margin: 2em 1em">
-        <a href="https://github.com/codeskyblue/gohttpserver">gohttpserver ({{version}})</a>, by <a href="https://github.com/codeskyblue">codeskyblue</a>.
-      </div>
-    </div> -->
   </div>
   <script>
     window.URL_PFEFIX = "[[.Prefix]]"
   </script>
+  [[if .PinRoot ]]
+  <script>
+    window.token = "[[.Token]]"
+  </script>
+  [[ end ]]
   <script src="[[.Prefix]]/-/assets/js/jquery-3.1.0.min.js"></script>
   <script src="[[.Prefix]]/-/assets/js/jquery.scrollUp.min.js"></script>
   <script src="[[.Prefix]]/-/assets/js/vue-1.0.min.js"></script>

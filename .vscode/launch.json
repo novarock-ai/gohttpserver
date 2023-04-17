@@ -6,7 +6,9 @@
       "type": "go",
       "mode": "debug",
       "console": "integratedTerminal",
-      "args": ["-r", "/Users/dingshinn/Desktop/streamlit-file-browser/example_artifacts/deep/ding", "--port", "9999", "--upload", "--auth-type", "openid"],
+      "args": [
+        "-r",
+        "./var", "--port", "9999", "--pin-root", "--upload"],
       "cwd": "${workspaceFolder}",
       "request": "launch",
       "program": "${workspaceRoot}/.",

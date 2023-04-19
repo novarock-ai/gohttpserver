@@ -56,6 +56,7 @@ type HTTPStaticServer struct {
 	Upload          bool
 	Delete          bool
 	Folder          bool
+	Download        bool
 	Title           string
 	Theme           string
 	PlistProxy      string
@@ -66,6 +67,11 @@ type HTTPStaticServer struct {
 	m       *mux.Router
 	bufPool sync.Pool // use sync.Pool caching buf to reduce gc ratio
 }
+
+const AccessUpload = 0b10000000
+const AccessDelete = 0b01000000
+const AccessFolder = 0b00100000
+const AccessDownload = 0b00010000
 
 func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	root = filepath.ToSlash(filepath.Clean(root))
@@ -134,20 +140,53 @@ func (s *HTTPStaticServer) getRealPath(r *http.Request) string {
 	return filepath.ToSlash(realPath)
 }
 
+func (s *HTTPStaticServer) getTokenClaims(r *http.Request) (claims jwt.MapClaims, err error) {
+	token := r.Header.Get("X-Requested-File-Server-Token")
+	if token == "" {
+		return nil, errors.New("token is empty")
+	}
+
+	claims, err = secret.ParseJWT(common.PublicKeyPath, token)
+	if err != nil {
+		fmt.Println("err: ", err)
+		return nil, err
+	}
+
+	return claims, nil
+}
+
+func (s *HTTPStaticServer) getAccessFromToken(r *http.Request) (*UserControl, error) {
+	claims, err := s.getTokenClaims(r)
+
+	if err != nil {
+		return nil, err
+	}
+
+	access := &UserControl{}
+	if val, ok := claims["upload"]; ok {
+		access.Upload = val.(bool)
+	}
+
+	if val, ok := claims["delete"]; ok {
+		access.Delete = val.(bool)
+	}
+
+	if val, ok := claims["folder"]; ok {
+		access.Folder = val.(bool)
+	}
+
+	if val, ok := claims["download"]; ok {
+		access.Download = val.(bool)
+	}
+
+	return access, nil
+}
+
 func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, path string) (isok bool, root string) {
-	// token := r.FormValue("token")
-	token := r.Header.Get("X-Requested-Root-Token")
+	claims, err := s.getTokenClaims(r)
 
 	if s.PinRoot {
-		if token == "" {
-			w.WriteHeader(http.StatusForbidden)
-			return false, ""
-		}
-		publicKeyPath := "./var/secret/public.pem"
-		claims, err := secret.ParseJWT(publicKeyPath, token)
 		if err != nil {
-			fmt.Println("err: ", err)
-			w.WriteHeader(http.StatusForbidden)
 			return false, ""
 		}
 
@@ -182,6 +221,15 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		if s.PinRoot {
 			re, _ := regexp.Compile(root)
 			s.PrefixReflect = []*regexp.Regexp{re}
+			access, err := s.getAccessFromToken(r)
+			if err != nil {
+				log.Println("err: ", err)
+				return
+			}
+			s.Upload = access.Upload
+			s.Delete = access.Delete
+			s.Folder = access.Folder
+			s.Download = access.Download
 		}
 		s.hJSONList(w, r)
 		return
@@ -205,12 +253,10 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if s.PinRoot {
-			secretPath := "./var/secret"
-			privatePath := "./var/secret/private.pem"
-			_, err := os.Lstat(privatePath)
+			_, err := os.Lstat(common.PrivateKeyPath)
 
 			if err != nil {
-				_, privatePath, err = secret.CreatePEM(secretPath)
+				_, _, err = secret.CreatePEM(common.SecretPath)
 				if err != nil {
 					log.Println("create pem error: ", err)
 					w.WriteHeader(http.StatusInternalServerError)
@@ -218,9 +264,26 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 
-			token, err := secret.CreateJWT(privatePath, jwt.MapClaims{
-				"root": path,
-			})
+			claims := jwt.MapClaims{
+				"root":     path,
+				"upload":   false,
+				"download": false,
+				"delete":   false,
+				"folder":   false,
+			}
+
+			accessStr := r.FormValue("access")
+			if accessStr != "" {
+				access, err := strconv.Atoi(accessStr)
+				if err == nil {
+					claims["upload"] = (access & AccessUpload) == AccessUpload
+					claims["download"] = (access & AccessDownload) == AccessDownload
+					claims["delete"] = (access & AccessDelete) == AccessDelete
+					claims["folder"] = (access & AccessFolder) == AccessFolder
+				}
+			}
+
+			token, err := secret.CreateJWT(common.PrivateKeyPath, claims)
 			if err != nil {
 				log.Println("create jwt error: ", err)
 				w.WriteHeader(http.StatusInternalServerError)
@@ -480,16 +543,18 @@ type AccessTable struct {
 type UserControl struct {
 	Email string
 	// Access bool
-	Upload bool
-	Delete bool
-	Folder bool
-	Token  string
+	Upload   bool
+	Delete   bool
+	Folder   bool
+	Download bool
+	Token    string
 }
 
 type AccessConf struct {
 	Upload       bool          `yaml:"upload" json:"upload"`
 	Delete       bool          `yaml:"delete" json:"delete"`
 	Folder       bool          `yaml:"folder" json:"folder"`
+	Download     bool          `yaml:"download" json:"download"`
 	Users        []UserControl `yaml:"users" json:"users"`
 	AccessTables []AccessTable `yaml:"accessTables"`
 }
@@ -550,6 +615,24 @@ func (c *AccessConf) canNewFolder(r *http.Request) bool {
 	return c.Folder
 }
 
+func (c *AccessConf) canDownload(r *http.Request) bool {
+	session, err := auth.Store.Get(r, auth.DefaultSessionName)
+	if err != nil {
+		return c.Download
+	}
+	val := session.Values["user"]
+	if val == nil {
+		return c.Download
+	}
+	userInfo := val.(*auth.UserInfo)
+	for _, rule := range c.Users {
+		if rule.Email == userInfo.Email {
+			return rule.Download
+		}
+	}
+	return c.Download
+}
+
 func (c *AccessConf) canUploadByToken(token string) bool {
 	for _, rule := range c.Users {
 		if rule.Token == token {
@@ -594,6 +677,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	auth.Upload = auth.canUpload(r)
 	auth.Delete = auth.canDelete(r)
 	auth.Folder = auth.canNewFolder(r)
+	auth.Download = auth.canDownload(r)
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
@@ -776,9 +860,10 @@ func (s *HTTPStaticServer) findIndex(text string) []IndexFileItem {
 
 func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
 	return AccessConf{
-		Upload: s.Upload,
-		Delete: s.Delete,
-		Folder: s.Folder,
+		Upload:   s.Upload,
+		Delete:   s.Delete,
+		Folder:   s.Folder,
+		Download: s.Download,
 	}
 }
 
@@ -873,16 +958,6 @@ func renderHTML(w http.ResponseWriter, name string, v interface{}) {
 	_tmpls[name] = t
 	t.Execute(w, v)
 }
-
-// func renderHTMLWithToken(w http.ResponseWriter, name string, v interface{}) {
-// 	if t, ok := _tmpls[name]; ok {
-// 		t.Execute(w, v)
-// 		return
-// 	}
-// 	t := template.Must(template.New(name).Funcs(funcMap).Delims("[[", "]]").Parse(assetsContent(name)))
-// 	_tmpls[name] = t
-// 	t.Execute(w, v)
-// }
 
 func checkFilename(name string) error {
 	if strings.ContainsAny(name, "\\/:*<>|") {

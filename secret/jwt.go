@@ -38,6 +38,10 @@ func ParseJWT(publicKeyPath string, tokenString string) (jwt.MapClaims, error) {
 		return publicKey, nil
 	})
 
+	if err != nil {
+		return nil, err
+	}
+
 	if claims, ok := parsedToken.Claims.(jwt.MapClaims); ok && parsedToken.Valid {
 		return claims, nil
 	}

@@ -94,7 +94,7 @@
             <td class="hidden-xs">{{formatTime(f.mtime)}}</td>
             <td style="text-align: left">
               <template v-if="f.type == 'dir'">
-                <a class="btn btn-default btn-xs" href="{{getEncodePath(f.name)}}/?op=archive">
+                <a class="btn btn-default btn-xs" v-if="auth.download" href="{{getEncodePath(f.name)}}/?op=archive">
                   <span class="hidden-xs">Archive</span> Zip
                   <span class="glyphicon glyphicon-download-alt"></span>
                 </a>
@@ -106,11 +106,11 @@
                 </button>
               </template>
               <template v-if="f.type == 'file'">
-                <a style="display:inline-block !important;" class="btn btn-default btn-xs hidden-xs" href="{{genDownloadURL(f)}}">
+                <a style="display:inline-block !important;" v-if="auth.download" class="btn btn-default btn-xs hidden-xs" href="{{genDownloadURL(f)}}">
                   <span class="hidden-xs">Download</span>
                   <span class="glyphicon glyphicon-download-alt"></span>
                 </a>
-                <button class="btn btn-default btn-xs bstooltip" data-trigger="manual" data-title="Copied!"
+                <button class="btn btn-default btn-xs bstooltip" v-if="auth.download" data-trigger="manual" data-title="Copied!"
                   data-clipboard-text="{{genDownloadURL(f)}}">
                   <i class="fa fa-copy"></i>
                 </button>

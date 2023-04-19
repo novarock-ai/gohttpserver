@@ -363,7 +363,7 @@ function loadFileList(pathname) {
       dataType: "json",
       cache: false,
       headers: {
-        "X-Requested-Root-Token": (window.token || "")
+        "X-Requested-File-Server-Token": (window.token || "")
       },
       success: function (res) {
         res.files = _.sortBy(res.files, function (f) {

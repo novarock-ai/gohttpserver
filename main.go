@@ -20,6 +20,7 @@ import (
 	accesslog "github.com/codeskyblue/go-accesslog"
 	"github.com/codeskyblue/gohttpserver/auth"
 	"github.com/codeskyblue/gohttpserver/common"
+	"github.com/codeskyblue/gohttpserver/secret"
 	"github.com/codeskyblue/gohttpserver/server"
 	"github.com/go-yaml/yaml"
 	"github.com/goji/httpauth"
@@ -28,26 +29,28 @@ import (
 )
 
 type Configure struct {
-	Conf            *os.File         `yaml:"-"`
-	Addr            string           `yaml:"addr"`
-	Port            int              `yaml:"port"`
-	Root            string           `yaml:"root"`
-	Prefix          string           `yaml:"prefix"`
-	PrefixReflect   []*regexp.Regexp `yaml:"prefix-reflect"`
-	PinRoot         bool             `yaml:"pin-root"`
-	HTTPAuth        string           `yaml:"httpauth"`
-	Cert            string           `yaml:"cert"`
-	Key             string           `yaml:"key"`
-	Cors            bool             `yaml:"cors"`
-	Theme           string           `yaml:"theme"`
-	XHeaders        bool             `yaml:"xheaders"`
-	Upload          bool             `yaml:"upload"`
-	Delete          bool             `yaml:"delete"`
-	Folder          bool             `yaml:"folder"`
-	PlistProxy      string           `yaml:"plistproxy"`
-	Title           string           `yaml:"title"`
-	Debug           bool             `yaml:"debug"`
-	GoogleTrackerID string           `yaml:"google-tracker-id"`
+	Conf          *os.File         `yaml:"-"`
+	Addr          string           `yaml:"addr"`
+	Port          int              `yaml:"port"`
+	Root          string           `yaml:"root"`
+	Prefix        string           `yaml:"prefix"`
+	PrefixReflect []*regexp.Regexp `yaml:"prefix-reflect"`
+	// This feature of `PinRoot` must be used with a gateway
+	PinRoot         bool   `yaml:"pin-root"`
+	HTTPAuth        string `yaml:"httpauth"`
+	Cert            string `yaml:"cert"`
+	Key             string `yaml:"key"`
+	Cors            bool   `yaml:"cors"`
+	Theme           string `yaml:"theme"`
+	XHeaders        bool   `yaml:"xheaders"`
+	Upload          bool   `yaml:"upload"`
+	Delete          bool   `yaml:"delete"`
+	Folder          bool   `yaml:"folder"`
+	Download        bool   `yaml:"download"`
+	PlistProxy      string `yaml:"plistproxy"`
+	Title           string `yaml:"title"`
+	Debug           bool   `yaml:"debug"`
+	GoogleTrackerID string `yaml:"google-tracker-id"`
 	Auth            struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
@@ -124,6 +127,7 @@ func parseFlags() error {
 	kingpin.Flag("upload", "enable upload support").BoolVar(&gcfg.Upload)
 	kingpin.Flag("delete", "enable delete support").BoolVar(&gcfg.Delete)
 	kingpin.Flag("folder", "enable folder support").BoolVar(&gcfg.Folder)
+	kingpin.Flag("download", "enable download support").BoolVar(&gcfg.Download)
 	kingpin.Flag("xheaders", "used when behide nginx").BoolVar(&gcfg.XHeaders)
 	kingpin.Flag("cors", "enable cross-site HTTP request").BoolVar(&gcfg.Cors)
 	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
@@ -185,6 +189,7 @@ func main() {
 	ss.Upload = gcfg.Upload
 	ss.Delete = gcfg.Delete
 	ss.Folder = gcfg.Folder
+	ss.Download = gcfg.Download
 	ss.AuthType = gcfg.Auth.Type
 
 	if gcfg.PlistProxy != "" {
@@ -236,6 +241,35 @@ func main() {
 			http.Redirect(w, r, gcfg.Prefix, http.StatusTemporaryRedirect)
 		})
 	}
+
+	router.HandleFunc("/-/token/parse", func(w http.ResponseWriter, r *http.Request) {
+		token := r.Header.Get("X-Requested-File-Server-Token")
+		w.Header().Set("Content-Type", "application/json")
+		if token == "" {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"msg":     "token is empty",
+			})
+			return
+		}
+
+		claims, err := secret.ParseJWT(common.PublicKeyPath, token)
+		if err != nil {
+			w.WriteHeader(http.StatusBadRequest)
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"success": false,
+				"msg":     err.Error(),
+			})
+			return
+		}
+
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"msg":     "ok",
+			"data":    claims,
+		})
+	})
 
 	router.PathPrefix("/-/assets/").Handler(http.StripPrefix(gcfg.Prefix+"/-/", http.FileServer(common.Assets)))
 	router.HandleFunc("/-/sysinfo", func(w http.ResponseWriter, r *http.Request) {

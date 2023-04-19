@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"net"
 	"net/http"
@@ -137,7 +137,7 @@ func parseFlags() error {
 		defer func() {
 			kingpin.Parse() // command line priority high than conf
 		}()
-		ymlData, err := ioutil.ReadAll(gcfg.Conf)
+		ymlData, err := io.ReadAll(gcfg.Conf)
 		if err != nil {
 			return err
 		}

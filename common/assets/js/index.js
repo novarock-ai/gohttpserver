@@ -1,5 +1,8 @@
 Dropzone.autoDiscover = false;
 
+const POSTMESSAGE_PREFIX = "filebrowser_";
+
+const getEventName = (name) => (`${POSTMESSAGE_PREFIX}${name}`);
 function getExtention(fname) {
   return fname.slice((fname.lastIndexOf(".") - 1 >>> 0) + 2);
 }
@@ -177,7 +180,7 @@ var vm = new Vue({
     },
     clickFileOrDir: function (f, e) {
       parent.postMessage({
-        event: f.type == "dir" ? "dir_selected" : "file_selected",
+        event: getEventName(f.type == "dir" ? "dir_selected" : "file_selected"),
         data: {
           file: f,
         }
@@ -188,7 +191,7 @@ var vm = new Vue({
     },
     changePath: function (reqPath, e) {
       parent.postMessage({
-        event: "path_changed",
+        event: getEventName("path_changed"),
         data: {
           path: reqPath,
         }
@@ -233,7 +236,7 @@ var vm = new Vue({
         return
       }
       parent.postMessage({
-        event: "dir_created",
+        event: getEventName("dir_created"),
         data: {
           name: name,
         }
@@ -257,7 +260,7 @@ var vm = new Vue({
     deletePathConfirm: function (f, e) {
       e.preventDefault();
       parent.postMessage({
-        event: "dir_deleted",
+        event: getEventName("dir_deleted"),
         data: {
           file: f
         }

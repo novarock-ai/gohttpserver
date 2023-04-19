@@ -198,7 +198,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Println("GET", path, realPath)
-	// r.URL.Path
+
 	if r.FormValue("raw") == "false" || common.IsDir(realPath) {
 		if r.Method == "HEAD" {
 			return

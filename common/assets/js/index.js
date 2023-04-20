@@ -132,6 +132,13 @@ var vm = new Vue({
     parentDirectory: function (path) {
       return path.replace('\\', '/').split('/').slice(0, -1).join('/')
     },
+    searchFiles: function () {
+      if (!this.search) {
+        return
+      }
+      const search = location.search ? location.search + `&search=${this.search}` : `?search=${this.search}`
+      loadFileList(location.pathname + search);
+    },
     changeParentDirectory: function (path) {
       var parentDir = this.parentDirectory(path);
       loadFileOrDir(parentDir);
@@ -204,6 +211,7 @@ var vm = new Vue({
       e.preventDefault()
     },
     changePath: function (reqPath, e) {
+      reqPath = reqPath.replace(/\/+/g, "/")
       parent.postMessage({
         event: getEventName("path_changed"),
         data: {

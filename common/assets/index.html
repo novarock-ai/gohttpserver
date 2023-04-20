@@ -33,10 +33,10 @@
             {{breadcrumb.slice(-1)[0].name}}
           </li>
         </ol>
-        <div>
+        <div style="display: flex;justify-content: space-between;align-items: center;margin-bottom:16px">
           <tr>
             <td colspan=4>
-              <div style="float:left">
+              <div style="flex:1">
                 <!-- <button class="btn btn-xs btn-default" onclick="history.back()"> -->
                 <button class="btn btn-xs btn-default" v-on:click="backOnePath($event)">
                   Back <i class="fa fa-arrow-left"></i>
@@ -51,16 +51,14 @@
                   New Folder <i class="fa fa-folder"></i>
                 </button>
               </div>
-              <div style="float:righr">
-                <div class="navbar-form navbar-right">
-                  <div class="input-group">
-                    <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" />
-                    <span class="input-group-btn">
-                      <button class="btn btn-default" @click="searchFiles()">
-                        <span class="glyphicon glyphicon-search"></span>
-                      </button>
-                    </span>
-                  </div>
+              <div style="flex:1">
+                <div class="input-group">
+                  <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" />
+                  <span class="input-group-btn">
+                    <button class="btn btn-default" @click="searchFiles()">
+                      <span class="glyphicon glyphicon-search"></span>
+                    </button>
+                  </span>
                 </div>
               </div>
             </td>

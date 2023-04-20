@@ -80,13 +80,13 @@
             </tr>
           </thead>
           <tr v-for="f in computedFiles">
-            <td>
+            <td @dblclick="doubleClickFile(f, $event)">
               <a v-on:click='clickFileOrDir(f, $event)' href="{{getEncodePath(f.name)}}">
                 <!-- ?raw=false -->
                 <i style="padding-right: 0.5em" class="fa" v-bind:class='genFileClass(f)'></i> {{f.name}}
               </a>
               <!-- for search -->
-              <button id="ding-test" v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
+              <button v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
                 <i class="fa fa-folder-open-o"></i>
               </button>
             </td>

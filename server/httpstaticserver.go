@@ -206,31 +206,6 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 
 	realPath := s.getRealPath(r)
 	if r.FormValue("json") == "true" {
-		ok, root := s.checkToken(w, r, path)
-		if !ok {
-			return
-		}
-		if !startsWith(root, "/") {
-			root = "/" + root
-		}
-
-		if endsWith(root, "/") {
-			root = root[:len(root)-1]
-		}
-
-		if s.PinRoot {
-			re, _ := regexp.Compile(root)
-			s.PrefixReflect = []*regexp.Regexp{re}
-			access, err := s.getAccessFromToken(r)
-			if err != nil {
-				log.Println("err: ", err)
-				return
-			}
-			s.Upload = access.Upload
-			s.Delete = access.Delete
-			s.Folder = access.Folder
-			s.Download = access.Download
-		}
 		s.hJSONList(w, r)
 		return
 	}
@@ -313,8 +288,23 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
 	path := mux.Vars(req)["path"]
 	realPath := s.getRealPath(req)
-	// path = filepath.Clean(path) // for safe reason, prevent path contain ..
-	auth := s.readAccessConf(realPath)
+
+	auth := AccessConf{}
+	if s.PinRoot {
+		access, err := s.getAccessFromToken(req)
+		if err != nil {
+			log.Println("err: ", err)
+			return
+		}
+		auth.Upload = access.Upload
+		auth.Delete = access.Delete
+		auth.Folder = access.Folder
+		auth.Download = access.Download
+	} else {
+		// path = filepath.Clean(path) // for safe reason, prevent path contain ..
+		auth = s.readAccessConf(realPath)
+	}
+
 	if !auth.canDelete(req) {
 		http.Error(w, "Delete forbidden", http.StatusForbidden)
 		return
@@ -337,8 +327,22 @@ func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
 func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Request) {
 	dirpath := s.getRealPath(req)
 
-	// check auth
-	auth := s.readAccessConf(dirpath)
+	auth := AccessConf{}
+	if s.PinRoot {
+		access, err := s.getAccessFromToken(req)
+		if err != nil {
+			log.Println("err: ", err)
+			return
+		}
+		auth.Upload = access.Upload
+		auth.Delete = access.Delete
+		auth.Folder = access.Folder
+		auth.Download = access.Download
+	} else {
+		// check auth
+		auth = s.readAccessConf(dirpath)
+	}
+
 	if !auth.canUpload(req) {
 		http.Error(w, "Upload forbidden", http.StatusForbidden)
 		return
@@ -643,17 +647,25 @@ func (c *AccessConf) canUploadByToken(token string) bool {
 }
 
 func (c *AccessConf) canUpload(r *http.Request) bool {
+	query := r.URL.Query()
+	uploadType := query.Get("type")
+
+	currentRes := c.Upload
+	if uploadType == "folder" {
+		currentRes = c.Folder
+	}
+
 	token := r.FormValue("token")
 	if token != "" {
 		return c.canUploadByToken(token)
 	}
 	session, err := auth.Store.Get(r, auth.DefaultSessionName)
 	if err != nil {
-		return c.Upload
+		return currentRes
 	}
 	val := session.Values["user"]
 	if val == nil {
-		return c.Upload
+		return currentRes
 	}
 	userInfo := val.(*auth.UserInfo)
 
@@ -662,7 +674,7 @@ func (c *AccessConf) canUpload(r *http.Request) bool {
 			return rule.Upload
 		}
 	}
-	return c.Upload
+	return currentRes
 }
 
 type ResponseConfigs struct {
@@ -671,18 +683,43 @@ type ResponseConfigs struct {
 
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
-	realPath := s.getRealPath(r)
-	search := r.FormValue("search")
-	auth := s.readAccessConf(realPath)
-	auth.Upload = auth.canUpload(r)
-	auth.Delete = auth.canDelete(r)
-	auth.Folder = auth.canNewFolder(r)
-	auth.Download = auth.canDownload(r)
 
+	auth := AccessConf{}
+	var prefixReflect []*regexp.Regexp
+	if s.PinRoot {
+		ok, root := s.checkToken(w, r, requestPath)
+		if !ok {
+			return
+		}
+		if !startsWith(root, "/") {
+			root = "/" + root
+		}
+		if endsWith(root, "/") {
+			root = root[:len(root)-1]
+		}
+		re, _ := regexp.Compile(root)
+		prefixReflect = []*regexp.Regexp{re}
+		access, err := s.getAccessFromToken(r)
+		if err != nil {
+			log.Println("err: ", err)
+			return
+		}
+		auth.Upload = access.Upload
+		auth.Delete = access.Delete
+		auth.Folder = access.Folder
+		auth.Download = access.Download
+	} else {
+		auth.Upload = auth.canUpload(r)
+		auth.Delete = auth.canDelete(r)
+		auth.Folder = auth.canNewFolder(r)
+		auth.Download = auth.canDownload(r)
+	}
+
+	realPath := s.getRealPath(r)
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
-	// fileInfoMap := make(map[string]fs.FileInfo, 0)
 	dirInfoMap := make(map[string]os.DirEntry, 0)
+	search := r.FormValue("search")
 	if search != "" {
 		results := s.findIndex(search)
 		if len(results) > 50 { // max 50
@@ -695,13 +732,11 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 	} else {
 		infos, err := os.ReadDir(realPath)
-		// infos, err := ioutil.ReadDir(realPath)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
 		for _, info := range infos {
-			// fileInfoMap[filepath.Join(requestPath, info.Name())] = info
 			dirInfoMap[filepath.Join(requestPath, info.Name())] = info
 		}
 	}
@@ -771,8 +806,8 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		lrs = append(lrs, lr)
 	}
 
-	prefixReflects := make([]string, len(s.PrefixReflect))
-	for i, re := range s.PrefixReflect {
+	prefixReflects := make([]string, len(prefixReflect))
+	for i, re := range prefixReflect {
 		prefixReflects[i] = re.String()
 	}
 
@@ -859,12 +894,13 @@ func (s *HTTPStaticServer) findIndex(text string) []IndexFileItem {
 }
 
 func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
-	return AccessConf{
+	ac := AccessConf{
 		Upload:   s.Upload,
 		Delete:   s.Delete,
 		Folder:   s.Folder,
 		Download: s.Download,
 	}
+	return ac
 }
 
 func (s *HTTPStaticServer) readAccessConf(realPath string) (ac AccessConf) {

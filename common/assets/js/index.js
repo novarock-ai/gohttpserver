@@ -95,6 +95,9 @@ var vm = new Vue({
       paramName: "file",
       maxFilesize: 102400,
       addRemoveLinks: true,
+      headers: {
+        "X-Requested-File-Server-Token": window.token,
+      },
       init: function () {
         this.on("uploadprogress", function (file, progress) {
           // console.log("File progress", progress);
@@ -132,6 +135,17 @@ var vm = new Vue({
     changeParentDirectory: function (path) {
       var parentDir = this.parentDirectory(path);
       loadFileOrDir(parentDir);
+    },
+    doubleClickFile: function (f, e) {
+      if (f.type === "dir") {
+        return
+      }
+      parent.postMessage({
+        event: getEventName(f.type == "dir" ? "dir_double_selected" : "file_double_selected"),
+        data: {
+          file: f,
+        }
+      }, '*');
     },
     genDownloadURL: function (f) {
       var search = location.search;
@@ -246,7 +260,7 @@ var vm = new Vue({
         return
       }
       $.ajax({
-        url: this.getEncodePath(name),
+        url: this.getEncodePath(name) + "?type=folder",
         method: "POST",
         success: function (res) {
           // console.log(res)
@@ -362,9 +376,6 @@ function loadFileList(pathname) {
       url: pathname + sep + "json=true",
       dataType: "json",
       cache: false,
-      headers: {
-        "X-Requested-File-Server-Token": (window.token || "")
-      },
       success: function (res) {
         res.files = _.sortBy(res.files, function (f) {
           var weight = f.type == 'dir' ? 1000 : 1;
@@ -424,6 +435,12 @@ Vue.filter('formatBytes', function (value) {
 })
 
 $(function () {
+  $.ajaxSetup({
+    beforeSend: function (xhr) {
+      window.token && xhr.setRequestHeader("X-Requested-File-Server-Token", window.token);
+    }
+  })
+
   $.scrollUp({
     scrollText: '', // text are defined in css
   });

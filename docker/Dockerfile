@@ -6,7 +6,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags '-X main.VERSION=docker' -o gohtt
 FROM alpine
 
 WORKDIR /app
-COPY assets .
+COPY common/assets .
 COPY --from=builder /app/gohttpserver/gohttpserver .
 EXPOSE 9999
 ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root"]

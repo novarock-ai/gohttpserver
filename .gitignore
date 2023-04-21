@@ -34,3 +34,4 @@ dist/
 
 k8s-manifests/*.yaml
 var
+Makefile

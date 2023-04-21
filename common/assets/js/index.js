@@ -35,6 +35,19 @@ function showErrorMessage(jqXHR) {
   console.error(errMsg)
 }
 
+Vue.filter('fromNow', function (value) {
+  return moment(value).fromNow();
+})
+
+Vue.filter('formatBytes', function (value) {
+  var bytes = parseFloat(value);
+  if (bytes < 0) return "-";
+  else if (bytes < 1024) return bytes + " B";
+  else if (bytes < 1048576) return (bytes / 1024).toFixed(0) + " KB";
+  else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
+  else return (bytes / 1073741824).toFixed(1) + " GB";
+})
+
 var vm = new Vue({
   el: "#app",
   data: {
@@ -91,30 +104,31 @@ var vm = new Vue({
         }
       }.bind(this)
     })
-    this.myDropzone = new Dropzone("#upload-form", {
-      paramName: "file",
-      maxFilesize: 102400,
-      addRemoveLinks: true,
-      headers: {
-        "X-Requested-File-Server-Token": window.token,
-      },
-      init: function () {
-        this.on("uploadprogress", function (file, progress) {
-          // console.log("File progress", progress);
-        });
-        this.on("complete", function (file) {
-          console.log("reload file list")
-          loadFileList()
-        })
-      }
-    });
+
+    const that = this;
+    setTimeout(function() {
+      that.myDropzone = new Dropzone("#upload-form", {
+        paramName: "file",
+        maxFilesize: 102400,
+        addRemoveLinks: true,
+        headers: {
+          "X-Requested-File-Server-Token": window.token,
+        },
+        init: function () {
+          this.on("complete", function (file) {
+            console.log("reload file list")
+            loadFileList()
+          })
+        }
+      });
+    }, 1000);
   },
   methods: {
     getLocationPathname: function () {
       return decodeURIComponent(location.pathname);
     },
-    getEncodePath: function (filepath) {
-      return pathJoin([this.getLocationPathname()].concat(filepath.split("/").map(v => encodeURIComponent(v))))
+    getEncodePath: function (filepath, search="") {
+      return pathJoin([this.getLocationPathname()].concat(filepath.split("/").map(v => encodeURIComponent(v)))) + search;
     },
     formatTime: function (timestamp) {
       var m = moment(timestamp);
@@ -428,19 +442,6 @@ function loadFileList(pathname) {
   // }
   return retObj
 }
-
-Vue.filter('fromNow', function (value) {
-  return moment(value).fromNow();
-})
-
-Vue.filter('formatBytes', function (value) {
-  var bytes = parseFloat(value);
-  if (bytes < 0) return "-";
-  else if (bytes < 1024) return bytes + " B";
-  else if (bytes < 1048576) return (bytes / 1024).toFixed(0) + " KB";
-  else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
-  else return (bytes / 1073741824).toFixed(1) + " GB";
-})
 
 $(function () {
   $.ajaxSetup({

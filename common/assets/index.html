@@ -7,156 +7,153 @@
   <meta name="theme-color" content="#000000">  
   <title>[[.Title]]</title>
   <link rel="shortcut icon" type="image/png" href="[[.Prefix]]/-/assets/favicon.png" />
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/bootstrap-3.3.5/css/bootstrap.min.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/font-awesome-4.6.3/css/font-awesome.min.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/github-markdown.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/dropzone.css">
-  <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/scrollUp-image.css">
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/css/style.css">
   <link rel="stylesheet" type="text/css" href="[[.Prefix]]/-/assets/themes/[[.Theme]].css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/bootstrap@3.3.5/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/dropzone@5.9.3/dist/dropzone.css">
 </head>
 
-<script src="[[.Prefix]]/-/assets/js/iframeResizer.contentWindow.min.js"></script>
-
-<body id="app">
-  <div class="container-wrapper" style="padding-left:unset;padding-right:unset">
-    <div class="col-md-12" style="padding:unset;">
-      <div style="position:sticky;top:0;z-index:999;background-color:#fff">
-        <ol class="breadcrumb" style="background-color:#f8f6f0">
-          <li>
-            <a v-on:click='changePath(homepage, $event)' href="/"><i class="fa fa-home"></i></a>
-          </li>
-          <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
-            <a v-on:click='changePath(homepage + "/" + bc.path, $event)' href="{{bc.path}}">{{bc.name}}</a>
-          </li>
-          <li v-if="breadcrumb.length >= 1">
-            {{breadcrumb.slice(-1)[0].name}}
-          </li>
-        </ol>
-        <div style="display: flex;justify-content: space-between;align-items: center;margin-bottom:16px">
-          <tr>
-            <td colspan=4>
-              <div style="flex:1">
-                <!-- <button class="btn btn-xs btn-default" onclick="history.back()"> -->
-                <button class="btn btn-xs btn-default" v-on:click="backOnePath($event)">
-                  Back <i class="fa fa-arrow-left"></i>
-                </button>
-                <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
-                  Hidden <i class="fa" v-bind:class='showHidden ? "fa-eye" : "fa-eye-slash"'></i>
-                </button>
-                <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal">
-                  Upload <i class="fa fa-upload"></i>
-                </button>
-                <button class="btn btn-xs btn-default" v-show="auth.folder" @click="makeDirectory">
-                  New Folder <i class="fa fa-folder"></i>
-                </button>
-              </div>
-              <div style="flex:1">
-                <div class="input-group">
-                  <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" />
-                  <span class="input-group-btn">
-                    <button class="btn btn-default" @click="searchFiles()">
-                      <span class="glyphicon glyphicon-search"></span>
-                    </button>
-                  </span>
-                </div>
-              </div>
-            </td>
-          </tr>
-        </div>
-      </div>
-      <table class="table table-hover" v-if="!previewMode">
-        <tbody>
-          <thead>
+<body>
+  <div id="app">
+    <div class="container-wrapper" style="padding-left:unset;padding-right:unset">
+      <div class="col-md-12" style="padding:unset;">
+        <div style="position:sticky;top:0;z-index:999;background-color:#fff">
+          <ol class="breadcrumb" style="background-color:#f8f6f0">
+            <li>
+              <a v-on:click='changePath(homepage, $event)' href="/"><i class="fa fa-home"></i></a>
+            </li>
+            <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
+              <a v-on:click='changePath(homepage + "/" + bc.path, $event)' v-bind:href="bc.path">{{bc.name}}</a>
+            </li>
+            <li v-if="breadcrumb.length >= 1">
+              {{breadcrumb.slice(-1)[0].name}}
+            </li>
+          </ol>
+          <div style="display: flex;justify-content: space-between;align-items: center;margin-bottom:16px">
             <tr>
-              <th>Name</th>
-              <th>Size</th>
-              <th class="hidden-xs">
-                <span style="cursor: pointer" v-on:click='mtimeTypeFromNow = !mtimeTypeFromNow'>ModTime</span>
-              </th>
-              <th>Actions</th>
+              <td colspan=4>
+                <div style="flex:1">
+                  <button class="btn btn-xs btn-default" v-on:click="backOnePath($event)">
+                    Back <i class="fa fa-arrow-left"></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
+                    Hidden <i class="fa" v-bind:class='showHidden ? "fa-eye" : "fa-eye-slash"'></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal">
+                    Upload <i class="fa fa-upload"></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-show="auth.folder" @click="makeDirectory">
+                    New Folder <i class="fa fa-folder"></i>
+                  </button>
+                </div>
+                <div style="flex:1">
+                  <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" />
+                    <span class="input-group-btn">
+                      <button class="btn btn-default" @click="searchFiles()">
+                        <span class="glyphicon glyphicon-search"></span>
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              </td>
             </tr>
-          </thead>
-          <tr v-for="f in computedFiles">
-            <td @dblclick="doubleClickFile(f, $event)">
-              <a v-on:click='clickFileOrDir(f, $event)' href="{{getEncodePath(f.name)}}">
-                <!-- ?raw=false -->
-                <i style="padding-right: 0.5em" class="fa" v-bind:class='genFileClass(f)'></i> {{f.name}}
-              </a>
-              <!-- for search -->
-              <button v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
-                <i class="fa fa-folder-open-o"></i>
-              </button>
-            </td>
-            <td><span v-if="f.type == 'dir'">~</span> {{f.size | formatBytes}}</td>
-            <td class="hidden-xs">{{formatTime(f.mtime)}}</td>
-            <td style="text-align: left">
-              <template v-if="f.type == 'dir'">
-                <a class="btn btn-default btn-xs" v-if="auth.download" href="{{getEncodePath(f.name)}}/?op=archive">
-                  <span class="hidden-xs">Archive</span> Zip
-                  <span class="glyphicon glyphicon-download-alt"></span>
+          </div>
+        </div>
+        <table class="table table-hover" v-if="!previewMode">
+          <tbody>
+            <thead>
+              <tr>
+                <th>Name</th>
+                <th>Size</th>
+                <th class="hidden-xs">
+                  <span style="cursor: pointer" v-on:click='mtimeTypeFromNow = !mtimeTypeFromNow'>ModTime</span>
+                </th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tr v-for="f in computedFiles">
+              <td @dblclick="doubleClickFile(f, $event)">
+                <a v-on:click='clickFileOrDir(f, $event)' v-bind:href="getEncodePath(f.name)">
+                  <!-- ?raw=false -->
+                  <i style="padding-right: 0.5em" class="fa" v-bind:class='genFileClass(f)'></i> {{f.name}}
                 </a>
-                <button class="btn btn-default btn-xs" v-on:click="showInfo(f)">
+                <!-- for search -->
+                <button v-show="f.type == 'file' && f.name.indexOf('/') >= 0" class="btn btn-default btn-xs" @click="changeParentDirectory(f.path)">
+                  <i class="fa fa-folder-open-o"></i>
+                </button>
+              </td>
+              <td><span v-if="f.type == 'dir'">~</span> {{f.size | formatBytes}}</td>
+              <td class="hidden-xs">{{formatTime(f.mtime)}}</td>
+              <td style="text-align: left">
+                <template v-if="f.type == 'dir'">
+                  <a class="btn btn-default btn-xs" v-if="auth.download" v-bind:href="getEncodePath(f.name, '/?op=archive')">
+                    <span class="hidden-xs">Archive</span> Zip
+                    <span class="glyphicon glyphicon-download-alt"></span>
+                  </a>
+                  <button class="btn btn-default btn-xs" v-on:click="showInfo(f)">
+                      <span class="glyphicon glyphicon-info-sign"></span>
+                  </button>
+                  <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
+                    <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
+                  </button>
+                </template>
+                <template v-if="f.type == 'file'">
+                  <a style="display:inline-block !important;" v-if="auth.download" class="btn btn-default btn-xs hidden-xs" v-bind:href="genDownloadURL(f)">
+                    <span class="hidden-xs">Download</span>
+                    <span class="glyphicon glyphicon-download-alt"></span>
+                  </a>
+                  <button class="btn btn-default btn-xs bstooltip" v-if="auth.download" data-trigger="manual" data-title="Copied!"
+                    v-bind:data-clipboard-text="genDownloadURL(f)">
+                    <i class="fa fa-copy"></i>
+                  </button>
+                  <button class="btn btn-default btn-xs" v-on:click="showInfo(f)">
                     <span class="glyphicon glyphicon-info-sign"></span>
-                </button>
-                <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
-                  <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
-                </button>
-              </template>
-              <template v-if="f.type == 'file'">
-                <a style="display:inline-block !important;" v-if="auth.download" class="btn btn-default btn-xs hidden-xs" href="{{genDownloadURL(f)}}">
-                  <span class="hidden-xs">Download</span>
-                  <span class="glyphicon glyphicon-download-alt"></span>
-                </a>
-                <button class="btn btn-default btn-xs bstooltip" v-if="auth.download" data-trigger="manual" data-title="Copied!"
-                  data-clipboard-text="{{genDownloadURL(f)}}">
-                  <i class="fa fa-copy"></i>
-                </button>
-                <button class="btn btn-default btn-xs" v-on:click="showInfo(f)">
-                  <span class="glyphicon glyphicon-info-sign"></span>
-                </button>
-                <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
-                  <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
-                </button>
-              </template>
-            </td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
-    <div class="col-md-12" id="content">
-      <!-- Upload modal-->
-      <div id="upload-modal" class="modal fade" tabindex="-1" role="dialog">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-              <h4 class="modal-title">
-                <i class="fa fa-upload"></i> File upload
-              </h4>
-            </div>
-            <div class="modal-body">
-              <form action="#" class="dropzone" id="upload-form"></form>
-            </div>
-            <div class="modal-footer">
-              <button type="button" class="btn btn-default" @click="removeAllUploads">RemoveAll</button>
-              <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+                  </button>
+                  <button class="btn btn-default btn-xs" v-if="auth.delete" v-on:click="deletePathConfirm(f, $event)">
+                    <span style="color:#CC3300" class="glyphicon glyphicon-trash"></span>
+                  </button>
+                </template>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="col-md-12" id="content">
+        <!-- Upload modal-->
+        <div id="upload-modal" class="modal fade" tabindex="-1" role="dialog">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">
+                  <i class="fa fa-upload"></i> File upload
+                </h4>
+              </div>
+              <div class="modal-body">
+                <form action="#" class="dropzone" id="upload-form"></form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-default" @click="removeAllUploads">RemoveAll</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
-      <!-- File info modal -->
-      <div id="file-info-modal" class="modal fade" tabindex="-1" role="dialog">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
-              <h4 class="modal-title">
-                <span id="file-info-title"></span>
-              </h4>
-            </div>
-            <div class="modal-body">
-              <pre id="file-info-content"></pre>
+        <!-- File info modal -->
+        <div id="file-info-modal" class="modal fade" tabindex="-1" role="dialog">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">
+                  <span id="file-info-title"></span>
+                </h4>
+              </div>
+              <div class="modal-body">
+                <pre id="file-info-content"></pre>
+              </div>
             </div>
           </div>
         </div>
@@ -171,17 +168,17 @@
     window.token = "[[.Token]]"
   </script>
   [[ end ]]
-  <script src="[[.Prefix]]/-/assets/js/jquery-3.1.0.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/jquery.scrollUp.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/vue-1.0.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/showdown-1.6.4.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/moment.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/dropzone.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/underscore-min.js"></script>
-  <script src="[[.Prefix]]/-/assets/js/clipboard-1.5.12.min.js"></script>
-  <script src="[[.Prefix]]/-/assets/bootstrap-3.3.5/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6/dist/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/jquery.scrollup@2.4.1/dist/jquery.scrollUp.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/vue@2.7.14/dist/vue.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/moment@2.29.4/moment.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dropzone@5.9.3/dist/min/dropzone.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/underscore@1.13.6/underscore-umd-min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/clipboard@1.5.12/dist/clipboard.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@3.3.5/dist/js/bootstrap.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/iframe-resizer@4.3.6/js/iframeResizer.contentWindow.min.js"></script>
   <script src='[[.Prefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>
-  <!-- <script src="[[.Prefix]]/-/assets/js/index.js"></script> -->
   <!--Sync status bar color with border-color on mobile platforms.-->
   <script>
     var META = document.getElementsByTagName("meta");

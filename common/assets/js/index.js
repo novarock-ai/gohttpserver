@@ -249,7 +249,7 @@ var vm = new Vue({
     },
     showInfo: function (f) {
       $.ajax({
-        url: this.getEncodePath(f.name),
+        url: this.getEncodePath(f.name) + location.search,
         data: {
           op: "info",
         },
@@ -282,7 +282,7 @@ var vm = new Vue({
         return
       }
       $.ajax({
-        url: this.getEncodePath(name) + "?type=folder",
+        url: this.getEncodePath(name) + location.search + "&type=folder",
         method: "POST",
         success: function (res) {
           // console.log(res)

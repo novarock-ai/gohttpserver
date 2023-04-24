@@ -47,6 +47,7 @@ type Configure struct {
 	Delete          bool   `yaml:"delete"`
 	Folder          bool   `yaml:"folder"`
 	Download        bool   `yaml:"download"`
+	Archive         bool   `yaml:"archive"`
 	PlistProxy      string `yaml:"plistproxy"`
 	Title           string `yaml:"title"`
 	Debug           bool   `yaml:"debug"`

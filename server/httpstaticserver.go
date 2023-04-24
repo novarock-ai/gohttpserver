@@ -182,12 +182,14 @@ func (s *HTTPStaticServer) getAccessFromToken(r *http.Request) (*UserControl, er
 	return access, nil
 }
 
-func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, path string) (isok bool, root string) {
-	claims, err := s.getTokenClaims(r)
-
+func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, path string) (bool, string, *jwt.MapClaims) {
+	var claims jwt.MapClaims
+	var err error
+	var root string
 	if s.PinRoot {
+		claims, err = s.getTokenClaims(r)
 		if err != nil {
-			return false, ""
+			return false, "", nil
 		}
 
 		root = claims["root"].(string)
@@ -195,10 +197,38 @@ func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, pa
 		if !startsWith(path, root) {
 			queryParams := r.URL.Query()
 			http.Redirect(w, r, "/"+root+"?"+queryParams.Encode(), http.StatusFound)
-			return false, ""
+			return false, "", nil
 		}
 	}
-	return true, root
+	return true, root, &claims
+}
+
+// func (s *HTTPStaticServer) checkVisibility(patterns, ignores []glob.Glob, path string) bool {
+func (s *HTTPStaticServer) checkVisibility(patterns, ignores []string, path string) bool {
+	match_patterns := true
+	not_ignore := false
+	if s.PinRoot {
+		if len(patterns) == 0 && len(ignores) == 0 {
+			return true
+		}
+		for _, pattern := range patterns {
+			// if pattern.Match(path) {
+			if common.CheckPath(pattern, path) {
+				match_patterns = true
+				break
+			}
+			match_patterns = false
+		}
+
+		for _, ignore := range ignores {
+			// if ignore.Match(path) {
+			if common.CheckPath(ignore, path) {
+				not_ignore = true
+				break
+			}
+		}
+	}
+	return match_patterns && !not_ignore
 }
 
 func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
@@ -240,11 +270,14 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 			}
 
 			claims := jwt.MapClaims{
-				"root":     path,
-				"upload":   false,
-				"download": false,
-				"delete":   false,
-				"folder":   false,
+				"root":       path,
+				"upload":     false,
+				"download":   false,
+				"delete":     false,
+				"folder":     false,
+				"patterns":   "",
+				"ignores":    "",
+				"extensions": "",
 			}
 
 			accessStr := r.FormValue("access")
@@ -256,6 +289,43 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 					claims["delete"] = (access & AccessDelete) == AccessDelete
 					claims["folder"] = (access & AccessFolder) == AccessFolder
 				}
+			}
+
+			patterns := r.FormValue("patterns")
+			if patterns != "" {
+				var _patterns []string
+				json.Unmarshal([]byte(patterns), &_patterns)
+				for index, pattern := range _patterns {
+					_patterns[index] = filepath.Join(s.Root, path, pattern)
+				}
+				_p, err := json.Marshal(_patterns)
+				if err != nil {
+					log.Println("marshal patterns error: ", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				claims["patterns"] = string(_p)
+			}
+
+			ignores := r.FormValue("ignores")
+			if ignores != "" {
+				var _ignores []string
+				json.Unmarshal([]byte(ignores), &_ignores)
+				for index, ignore := range _ignores {
+					_ignores[index] = filepath.Join(s.Root, path, ignore)
+				}
+				_i, err := json.Marshal(_ignores)
+				if err != nil {
+					log.Println("marshal ignores error: ", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				claims["ignores"] = string(_i)
+			}
+
+			extensions := r.FormValue("extensions")
+			if extensions != "" {
+				claims["extensions"] = extensions
 			}
 
 			token, err := secret.CreateJWT(common.PrivateKeyPath, claims)
@@ -683,14 +753,37 @@ type ResponseConfigs struct {
 
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
-
+	realPath := s.getRealPath(r)
+	// var patterns []glob.Glob
+	// var ignores []glob.Glob
+	var patterns []string
+	var ignores []string
+	var extensions []string
 	auth := AccessConf{}
 	var prefixReflect []*regexp.Regexp
 	if s.PinRoot {
-		ok, root := s.checkToken(w, r, requestPath)
+		ok, root, claims := s.checkToken(w, r, requestPath)
 		if !ok {
 			return
 		}
+		if claims != nil {
+			_patterns := (*claims)["patterns"].(string)
+			err := json.Unmarshal([]byte(_patterns), &patterns)
+			if err != nil {
+				log.Println("err: ", err)
+			}
+			_ignores := (*claims)["ignores"].(string)
+			err = json.Unmarshal([]byte(_ignores), &ignores)
+			if err != nil {
+				log.Println("err: ", err)
+			}
+			_extensions := (*claims)["extensions"].(string)
+			err = json.Unmarshal([]byte(_extensions), &extensions)
+			if err != nil {
+				log.Println("err: ", err)
+			}
+		}
+
 		if !startsWith(root, "/") {
 			root = "/" + root
 		}
@@ -715,7 +808,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		auth.Download = auth.canDownload(r)
 	}
 
-	realPath := s.getRealPath(r)
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
 	dirInfoMap := make(map[string]os.DirEntry, 0)
@@ -727,7 +819,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			if index > 50 {
 				break
 			}
-			if strings.HasPrefix(item.Path, requestPath) {
+			if strings.HasPrefix(item.Path, requestPath) && s.checkVisibility(patterns, ignores, filepath.Join(realPath, item.Path)) {
 				fileInfoMap[item.Path] = item.Info
 				index++
 			}
@@ -739,7 +831,9 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, info := range infos {
-			dirInfoMap[filepath.Join(requestPath, info.Name())] = info
+			if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
+				dirInfoMap[filepath.Join(requestPath, info.Name())] = info
+			}
 		}
 	}
 
@@ -813,13 +907,29 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		prefixReflects[i] = re.String()
 	}
 
+	extensionsMaps := make(map[string]bool)
+	for _, ext := range extensions {
+		extensionsMaps[ext] = true
+	}
+
+	newLrs := make([]HTTPFileInfo, 0)
+	for _, l := range lrs {
+		if l.Type == "file" && len(extensions) > 0 {
+			ext := filepath.Ext(l.Name)
+			if _, ok := extensionsMaps[ext]; !ok {
+				continue
+			}
+		}
+		newLrs = append(newLrs, l)
+	}
 	data, _ := json.Marshal(map[string]interface{}{
-		"files": lrs,
+		"files": newLrs,
 		"auth":  auth,
 		"configs": ResponseConfigs{
 			PrefixReflect: prefixReflects,
 		},
 	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write(data)
 }

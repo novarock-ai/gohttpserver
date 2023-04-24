@@ -96,3 +96,108 @@ func IsDir(path string) bool {
 	info, err := os.Stat(path)
 	return err == nil && info.Mode().IsDir()
 }
+
+func getSeparatedPath(path string) []string {
+	pathSeparated := []string{}
+	tmpStr := ""
+	index := 0
+	for index < len(path) {
+		if path[index] == '*' {
+			if index+1 < len(path) && path[index+1] == '*' {
+				if tmpStr != "" {
+					pathSeparated = append(pathSeparated, tmpStr)
+				}
+				pathSeparated = append(pathSeparated, "**")
+				index += 2
+				tmpStr = ""
+			} else {
+				if tmpStr != "" {
+					pathSeparated = append(pathSeparated, tmpStr)
+				}
+				pathSeparated = append(pathSeparated, "*")
+				index += 1
+				tmpStr = ""
+			}
+		} else {
+			tmpStr += string(path[index])
+		}
+		index++
+	}
+	if tmpStr != "" {
+		pathSeparated = append(pathSeparated, tmpStr)
+	}
+	return pathSeparated
+}
+
+func CheckPath(path1, path2 string) bool {
+	if len(path1) == 0 || len(path2) == 0 {
+		return true
+	}
+	path1 = strings.TrimPrefix(path1, "/")
+	path2 = strings.TrimPrefix(path2, "/")
+	if (path1 != "" && path2 == "") || (path1 == "" && path2 != "") {
+		if path1 == "*" || path1 == "**" {
+			return true
+		}
+		return false
+	}
+	path1Separated := getSeparatedPath(path1)
+
+	for len(path1Separated) > 0 && len(path2) > 0 {
+		p1 := path1Separated[0]
+		if p1 == "*" {
+			path1Separated = path1Separated[1:]
+			path2 = strings.TrimPrefix(path2, "/")
+			index := strings.Index(path2, "/")
+			if index == -1 {
+				for p1 == "*" || p1 == "**" {
+					if len(path1Separated) == 0 {
+						return true
+					}
+					p1 = path1Separated[0]
+					path1Separated = path1Separated[1:]
+				}
+				return false
+			}
+			path2 = path2[index:]
+			continue
+		}
+		if p1 == "**" {
+			for p1 == "*" || p1 == "**" {
+				if len(path1Separated) == 1 {
+					return true
+				}
+				path1Separated = path1Separated[1:]
+				p1 = path1Separated[0]
+			}
+
+			index := strings.Index(path2, p1)
+			if index == -1 {
+				return false
+			}
+			path2 = path2[index+len(p1):]
+			path1Separated = path1Separated[1:]
+			continue
+		}
+		path2 = strings.TrimPrefix(path2, "/")
+		path2 = strings.TrimSuffix(path2, "/")
+		p1 = strings.TrimPrefix(p1, "/")
+		p1 = strings.TrimSuffix(p1, "/")
+		if strings.HasPrefix(strings.TrimPrefix(path2, "/"), strings.TrimPrefix(p1, "/")) {
+			path2 = path2[len(p1):]
+			path1Separated = path1Separated[1:]
+			continue
+		}
+		return false
+	}
+
+	if len(path2) == 0 && len(path1Separated) > 0 {
+		path := strings.Join(path1Separated, "")
+		path = strings.ReplaceAll(path, "*", "")
+		if path != "" {
+			return false
+		}
+	}
+
+	return true
+}

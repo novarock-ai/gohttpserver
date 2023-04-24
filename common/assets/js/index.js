@@ -151,7 +151,7 @@ var vm = new Vue({
         return
       }
       const search = location.search ? location.search + `&search=${this.search}` : `?search=${this.search}`
-      loadFileList(location.pathname + search);
+      loadFileList(this.homepage + search);
     },
     changeParentDirectory: function (path) {
       var parentDir = this.parentDirectory(path);
@@ -378,6 +378,7 @@ window.onpopstate = function (event) {
 }
 
 function loadFileOrDir(reqPath) {
+  reqPath = reqPath.startsWith('/') ? reqPath : '/' + reqPath;
   const requestUri = (reqPath || "/") + location.search
   const retObj = loadFileList(requestUri)
   if (retObj !== null) {

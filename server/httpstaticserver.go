@@ -819,7 +819,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			if index > 50 {
 				break
 			}
-			if strings.HasPrefix(item.Path, requestPath) && s.checkVisibility(patterns, ignores, filepath.Join(realPath, item.Path)) {
+			if strings.HasPrefix(item.Path, requestPath) && s.checkVisibility(patterns, ignores, filepath.Join(s.Root, item.Path)) {
 				fileInfoMap[item.Path] = item.Info
 				index++
 			}

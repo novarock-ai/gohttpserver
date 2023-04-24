@@ -73,7 +73,7 @@ const AccessUpload = 0b10000000
 const AccessDelete = 0b01000000
 const AccessFolder = 0b00100000
 const AccessDownload = 0b00010000
-const AccessArchive = 0b0000100
+const AccessArchive = 0b00001000
 
 func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	root = filepath.ToSlash(filepath.Clean(root))

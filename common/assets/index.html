@@ -100,6 +100,9 @@
                   </button>
                 </template>
                 <template v-if="f.type == 'file'">
+                  <button class="btn btn-default btn-xs" v-if="Object.fromEntries(new URLSearchParams(window.location.search).entries()).choose==='true'" v-on:click="chooseFile(f)">
+                    <span class="glyphicon glyphicon-plus"></span>
+                  </button>
                   <a style="display:inline-block !important;" v-if="auth.download" class="btn btn-default btn-xs hidden-xs" v-bind:href="genDownloadURL(f)">
                     <span class="hidden-xs">Download</span>
                     <span class="glyphicon glyphicon-download-alt"></span>

@@ -129,6 +129,7 @@ func parseFlags() error {
 	kingpin.Flag("delete", "enable delete support").BoolVar(&gcfg.Delete)
 	kingpin.Flag("folder", "enable folder support").BoolVar(&gcfg.Folder)
 	kingpin.Flag("download", "enable download support").BoolVar(&gcfg.Download)
+	kingpin.Flag("archive", "enable archive folder support").BoolVar(&gcfg.Archive)
 	kingpin.Flag("xheaders", "used when behide nginx").BoolVar(&gcfg.XHeaders)
 	kingpin.Flag("cors", "enable cross-site HTTP request").BoolVar(&gcfg.Cors)
 	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
@@ -191,6 +192,7 @@ func main() {
 	ss.Delete = gcfg.Delete
 	ss.Folder = gcfg.Folder
 	ss.Download = gcfg.Download
+	ss.Archive = gcfg.Archive
 	ss.AuthType = gcfg.Auth.Type
 
 	if gcfg.PlistProxy != "" {

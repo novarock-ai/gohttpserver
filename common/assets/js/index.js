@@ -137,6 +137,18 @@ var vm = new Vue({
       }
       return m.format('YYYY-MM-DD HH:mm:ss');
     },
+    // business customized
+    chooseFile: function (f) {
+      if (f.type === "dir") {
+        return
+      }
+      parent.postMessage({
+        event: getEventName("file_choose"),
+        data: {
+          file: f,
+        }
+      }, '*');
+    },
     toggleHidden: function () {
       this.showHidden = !this.showHidden;
     },

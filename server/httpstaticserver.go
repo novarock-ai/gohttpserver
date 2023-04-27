@@ -48,21 +48,22 @@ type Directory struct {
 }
 
 type HTTPStaticServer struct {
-	Root            string
-	Prefix          string
-	PrefixReflect   []*regexp.Regexp
-	PinRoot         bool
-	Token           string
-	Upload          bool
-	Delete          bool
-	Folder          bool
-	Download        bool
-	Archive         bool
-	Title           string
-	Theme           string
-	PlistProxy      string
-	GoogleTrackerID string
-	AuthType        string
+	Root              string
+	Prefix            string
+	PrefixReflect     []*regexp.Regexp
+	PinRoot           bool
+	NotExistAutoMkdir bool
+	Token             string
+	Upload            bool
+	Delete            bool
+	Folder            bool
+	Download          bool
+	Archive           bool
+	Title             string
+	Theme             string
+	PlistProxy        string
+	GoogleTrackerID   string
+	AuthType          string
 
 	indexes []IndexFileItem
 	m       *mux.Router
@@ -107,6 +108,10 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	m.HandleFunc("/{path:.*}", s.hUploadOrMkdir).Methods("POST")
 	m.HandleFunc("/{path:.*}", s.hDelete).Methods("DELETE")
 	return s
+}
+
+func (s *HTTPStaticServer) AutoMkdir(path string) error {
+	return os.MkdirAll(path, 0755)
 }
 
 func (s *HTTPStaticServer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -358,6 +363,20 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.FormValue("download") == "true" {
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
+		}
+		if s.NotExistAutoMkdir {
+			_, err := os.Stat(realPath)
+			if err != nil && os.IsNotExist(err) {
+				err := s.AutoMkdir(realPath)
+				if err != nil {
+					log.Println("mkdir error: ", err)
+					w.WriteHeader(http.StatusInternalServerError)
+					return
+				}
+				s.hIndex(w, r)
+				return
+			}
+			return
 		}
 		http.ServeFile(w, r, realPath)
 	}

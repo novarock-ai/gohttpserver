@@ -36,23 +36,24 @@ type Configure struct {
 	Prefix        string           `yaml:"prefix"`
 	PrefixReflect []*regexp.Regexp `yaml:"prefix-reflect"`
 	// This feature of `PinRoot` must be used with a gateway
-	PinRoot         bool   `yaml:"pin-root"`
-	HTTPAuth        string `yaml:"httpauth"`
-	Cert            string `yaml:"cert"`
-	Key             string `yaml:"key"`
-	Cors            bool   `yaml:"cors"`
-	Theme           string `yaml:"theme"`
-	XHeaders        bool   `yaml:"xheaders"`
-	Upload          bool   `yaml:"upload"`
-	Delete          bool   `yaml:"delete"`
-	Folder          bool   `yaml:"folder"`
-	Download        bool   `yaml:"download"`
-	Archive         bool   `yaml:"archive"`
-	PlistProxy      string `yaml:"plistproxy"`
-	Title           string `yaml:"title"`
-	Debug           bool   `yaml:"debug"`
-	GoogleTrackerID string `yaml:"google-tracker-id"`
-	Auth            struct {
+	PinRoot           bool   `yaml:"pin-root"`
+	NotExistAutoMkdir bool   `yaml:"not-exist-auto-mkdir"`
+	HTTPAuth          string `yaml:"httpauth"`
+	Cert              string `yaml:"cert"`
+	Key               string `yaml:"key"`
+	Cors              bool   `yaml:"cors"`
+	Theme             string `yaml:"theme"`
+	XHeaders          bool   `yaml:"xheaders"`
+	Upload            bool   `yaml:"upload"`
+	Delete            bool   `yaml:"delete"`
+	Folder            bool   `yaml:"folder"`
+	Download          bool   `yaml:"download"`
+	Archive           bool   `yaml:"archive"`
+	PlistProxy        string `yaml:"plistproxy"`
+	Title             string `yaml:"title"`
+	Debug             bool   `yaml:"debug"`
+	GoogleTrackerID   string `yaml:"google-tracker-id"`
+	Auth              struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
 		HTTP   string `yaml:"http"`
@@ -117,6 +118,7 @@ func parseFlags() error {
 	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
 	kingpin.Flag("prefix-reflect", "url prefix reflect, eg /foo/bar will be reflected to /").RegexpListVar(&gcfg.PrefixReflect)
 	kingpin.Flag("pin-root", "pin root directory, default false").BoolVar(&gcfg.PinRoot)
+	kingpin.Flag("not-exist-auto-mkdir", "auto make the dir that not exist, default false").BoolVar(&gcfg.NotExistAutoMkdir)
 	kingpin.Flag("port", "listen port, default 8000").IntVar(&gcfg.Port)
 	kingpin.Flag("addr", "listen address, eg 127.0.0.1:8000").Short('a').StringVar(&gcfg.Addr)
 	kingpin.Flag("cert", "tls cert.pem path").StringVar(&gcfg.Cert)
@@ -182,9 +184,15 @@ func main() {
 	// fmt.Println(gcfg.PrefixReflect[0].String())
 
 	ss := server.NewHTTPStaticServer(gcfg.Root)
+	// it will auto make dir if the gcfg.Root is not exist
+	// if gcfg.NotExistAutoMkdir {
+	// 	ss.AutoMkdir(gcfg.Root)
+	// }
+
 	ss.Prefix = gcfg.Prefix
 	ss.PrefixReflect = gcfg.PrefixReflect
 	ss.PinRoot = gcfg.PinRoot
+	ss.NotExistAutoMkdir = gcfg.NotExistAutoMkdir
 	ss.Theme = gcfg.Theme
 	ss.Title = gcfg.Title
 	ss.GoogleTrackerID = gcfg.GoogleTrackerID

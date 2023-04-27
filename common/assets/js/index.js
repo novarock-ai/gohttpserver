@@ -93,18 +93,6 @@ var vm = new Vue({
     },
   },
   created: function () {
-    $.ajax({
-      url: "/-/user",
-      method: "get",
-      dataType: "json",
-      success: function (ret) {
-        if (ret) {
-          this.user.email = ret.email;
-          this.user.name = ret.name;
-        }
-      }.bind(this)
-    })
-
     const that = this;
     setTimeout(function() {
       that.myDropzone = new Dropzone("#upload-form", {

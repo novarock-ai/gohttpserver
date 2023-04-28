@@ -363,20 +363,21 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.FormValue("download") == "true" {
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
-		}
-		if s.NotExistAutoMkdir {
-			_, err := os.Stat(realPath)
-			if err != nil && os.IsNotExist(err) {
-				err := s.AutoMkdir(realPath)
-				if err != nil {
-					log.Println("mkdir error: ", err)
-					w.WriteHeader(http.StatusInternalServerError)
+		} else {
+			if s.NotExistAutoMkdir {
+				_, err := os.Stat(realPath)
+				if err != nil && os.IsNotExist(err) {
+					err := s.AutoMkdir(realPath)
+					if err != nil {
+						log.Println("mkdir error: ", err)
+						w.WriteHeader(http.StatusInternalServerError)
+						return
+					}
+					s.hIndex(w, r)
 					return
 				}
-				s.hIndex(w, r)
 				return
 			}
-			return
 		}
 		http.ServeFile(w, r, realPath)
 	}

@@ -877,20 +877,27 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
+		start := time.Now()
 		infos, err := os.ReadDir(realPath)
+		elapsed := time.Since(start)
+		fmt.Printf("\x1b[32m 查询文件的时间是: %v \x1b[0m\n", elapsed)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+		start = time.Now()
 		for _, info := range infos {
 			if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
 				dirInfoMap[filepath.Join(requestPath, info.Name())] = info
 			}
 		}
+		elapsed = time.Since(start)
+		fmt.Printf("\x1b[32m 第 1 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 	}
 
 	// turn file list -> json
 	lrs := make([]HTTPFileInfo, 0)
+	start := time.Now()
 	for path, info := range fileInfoMap {
 		if !auth.canAccess(info.Name()) {
 			continue
@@ -908,7 +915,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Name = filepath.ToSlash(name) // fix for windows
 		}
 		if info.IsDir() {
-			name := deepPath(realPath, info.Name())
+			name := info.Name()
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
 			lr.Type = "dir"
@@ -919,7 +926,10 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		lrs = append(lrs, lr)
 	}
+	elapsed := time.Since(start)
+	fmt.Printf("\x1b[32m 第 2 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 
+	start = time.Now()
 	for path, info := range dirInfoMap {
 		if !auth.canAccess(info.Name()) {
 			continue
@@ -942,7 +952,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Name = filepath.ToSlash(name) // fix for windows
 		}
 		if info.IsDir() {
-			name := deepPath(realPath, info.Name())
+			name := info.Name()
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
 			lr.Type = "dir"
@@ -953,6 +963,8 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		lrs = append(lrs, lr)
 	}
+	elapsed = time.Since(start)
+	fmt.Printf("\x1b[32m 第 3 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 
 	prefixReflects := make([]string, len(prefixReflect))
 	for i, re := range prefixReflect {
@@ -1093,23 +1105,6 @@ func (s *HTTPStaticServer) readAccessConf(realPath string) (ac AccessConf) {
 		log.Printf("Err format .ghs.yml: %v", err)
 	}
 	return
-}
-
-func deepPath(basedir, name string) string {
-	// loop max 5, incase of for loop not finished
-	maxDepth := 5
-	for depth := 0; depth <= maxDepth; depth += 1 {
-		finfos, err := os.ReadDir(filepath.Join(basedir, name))
-		if err != nil || len(finfos) != 1 {
-			break
-		}
-		if finfos[0].IsDir() {
-			name = filepath.ToSlash(filepath.Join(name, finfos[0].Name()))
-		} else {
-			break
-		}
-	}
-	return name
 }
 
 func assetsContent(name string) string {

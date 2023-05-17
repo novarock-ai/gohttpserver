@@ -2,7 +2,9 @@
 *.o
 *.a
 *.so
-
+test-dir
+var-ding-test
+*.db
 # Folders
 _obj
 _test

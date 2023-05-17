@@ -48,6 +48,27 @@ Vue.filter('formatBytes', function (value) {
   else return (bytes / 1073741824).toFixed(1) + " GB";
 })
 
+// Vue.component('my-component', {
+//   template: `
+//     <RecycleScroller
+//       class="scroller"
+//       :items="list"
+//       :item-size="5"
+//       key-field="id"
+//       v-slot="{ item }"
+//     >
+//       <div class="user">
+//         {{ item.name }}
+//       </div>
+//     </RecycleScroller>
+//   `,
+//   data: function() {
+//     return {
+//       list: [{id: 1,name: "ding1"}]
+//     }
+//   }
+// });
+
 var vm = new Vue({
   el: "#app",
   data: {

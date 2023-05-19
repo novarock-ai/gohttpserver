@@ -27,6 +27,7 @@ div.dropzone {
 
 .ve-table-body-td a {
     color: #000;
+    cursor: pointer;
 }
 
 .ve-table-header-th:nth-child(3) {

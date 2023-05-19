@@ -122,13 +122,14 @@ var vm = new Vue({
             return null
           }
           auth = vm.auth;
+          allowZip = row.size < 1024 * 1024 * 200;
           return h('div', {
             class: "actions",
             style: { "text-align": "center" },
           }, [
             row.type === "dir" ?
               h('div', {}, [
-                auth.archive && h('a', {
+                allowZip && auth.archive && h('a', {
                   class: "btn btn-default btn-xs ding-test",
                   attrs: {
                     href: vm && vm.getEncodePath(row.name, '/' + location.search + '&op=archive'),

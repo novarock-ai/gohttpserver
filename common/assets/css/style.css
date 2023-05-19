@@ -24,3 +24,11 @@ div.dropzone {
 .clearfix::after {
     clear: both;
 }
+
+.ve-table-body-td a {
+    color: #000;
+}
+
+.ve-table-header-th:nth-child(3) {
+    cursor: pointer;
+}

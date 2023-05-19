@@ -35,43 +35,174 @@ function showErrorMessage(jqXHR) {
   console.error(errMsg)
 }
 
-Vue.filter('fromNow', function (value) {
+const fromNow = function (value) {
   return moment(value).fromNow();
-})
+}
+Vue.filter('fromNow', fromNow)
 
-Vue.filter('formatBytes', function (value) {
+const formatBytes = function (value) {
   var bytes = parseFloat(value);
   if (bytes < 0) return "-";
   else if (bytes < 1024) return bytes + " B";
   else if (bytes < 1048576) return (bytes / 1024).toFixed(0) + " KB";
   else if (bytes < 1073741824) return (bytes / 1048576).toFixed(1) + " MB";
   else return (bytes / 1073741824).toFixed(1) + " GB";
-})
+}
 
-// Vue.component('my-component', {
-//   template: `
-//     <RecycleScroller
-//       class="scroller"
-//       :items="list"
-//       :item-size="5"
-//       key-field="id"
-//       v-slot="{ item }"
-//     >
-//       <div class="user">
-//         {{ item.name }}
-//       </div>
-//     </RecycleScroller>
-//   `,
-//   data: function() {
-//     return {
-//       list: [{id: 1,name: "ding1"}]
-//     }
-//   }
-// });
+Vue.filter('formatBytes', formatBytes)
 
 var vm = new Vue({
   el: "#app",
   data: {
+    virtualScrollOption: {
+      enable: false,
+    },
+    cellSelectionOption: {
+      enable: false,
+    },
+    columns: [
+      {
+        field: "name",
+        key: "Name",
+        title: "Name",
+        align: "left",
+        renderBodyCell: ({ row }, h) => {
+          return h('div', {
+            class: "name",
+          }, [
+            h('a', {
+              href: vm && vm.getEncodePath(row.name),
+              on: {
+                click: (e) => vm.clickFileOrDir(row, e)
+              }
+            }, [
+              h('i', {
+                class: `fa ${vm && vm.genFileClass(row)}`,
+                style: {
+                  "padding-right": "0.5em"
+                }
+              }),
+              row.name,
+            ]),
+           (row.type === 'file' && row.name.indexOf('/') >= 0) && h('button', {
+            class: "btn btn-default btn-xs",
+            on: {
+              click: (e) => vm.changeParentDirectory(row.path)
+            }
+           }, [ h('i', { class: "fa fa-folder-open-o" }) ])
+          ]);
+        }
+      },
+      {
+        field: "size",
+        key: "Size",
+        title: "Size",
+        align: "left",
+        renderBodyCell: ({ row }) => {
+          const size = row.size;
+          const type = row.type;
+          return (type === "dir" ? "~" : "") + formatBytes(size)
+        }
+      },
+      {
+        field: "mtime",
+        key: "ModTime",
+        title: "ModTime",
+        align: "left",
+        renderBodyCell: ({ row }) => {
+          return vm ? vm.formatTime(row.mtime) : ''
+        },
+      },
+      {
+        field: "",
+        key: "Action",
+        title: "Action",
+        renderBodyCell: function ({ row }, h){
+          if (!vm) {
+            return null
+          }
+          auth = vm.auth;
+          return h('div', {
+            class: "actions",
+            style: { "text-align": "center" },
+          }, [
+            row.type === "dir" ?
+              h('div', {}, [
+                auth.archive && h('a', {
+                  class: "btn btn-default btn-xs ding-test",
+                  attrs: {
+                    href: vm && vm.getEncodePath(row.name, '/' + location.search + '&op=archive'),
+                  },
+                }, [
+                  h('span', { class: "hidden-xs" }, "Archive"),
+                  "Zip",
+                  h('span', { class: "glyphicon glyphicon-download-alt" }),
+                ]),
+                h('button', {
+                  class: "btn btn-default btn-xs",
+                  on: {
+                    click: (e) => vm.showInfo(row)
+                  }
+                }, [h('span', { class: "glyphicon glyphicon-info-sign" })]),
+                auth.delete && h('button', {
+                  class: "btn btn-default btn-xs",
+                  on: {
+                    click: (e) => vm.deletePathConfirm(row, e)
+                  }
+                }, [h('span', {
+                  class: "glyphicon glyphicon-trash",
+                  style: { color: "#CC3300", }
+                })]),
+              ]) : row.type === "file" ?
+              h('div', {}, [
+                Object.fromEntries(new URLSearchParams(window.location.search).entries()).choose==='true' && h('button', {
+                  class: "btn btn-default btn-xs",
+                  on: {
+                    click: (e) => vm.chooseFile(row),
+                  }
+                }, [h('span', { class: "glyphicon glyphicon-plus" })]),
+                auth.download && h('a', {
+                  class: "btn btn-default btn-xs hidden-xs",
+                  attrs: {
+                    href: vm.genDownloadURL(row),
+                  },
+                  style: {
+                    display: "inline-block !important",
+                  }
+                }, [
+                  h('span', { class: "hidden-xs", }, "Download"),
+                  h('span', { class: "glyphicon glyphicon-download-alt", }),
+                ]),
+                h('button', {
+                  class: "btn btn-default btn-xs",
+                  on: {
+                    click: (e) => vm.showInfo(row),
+                  }
+                }, [h('span', { class: "glyphicon glyphicon-info-sign" })]),
+                auth.delete && h('button', {
+                  class: "btn btn-default btn-xs",
+                  on: {
+                    click: (e) => vm.deletePathConfirm(item, e)
+                  }
+                }, [h('span', {
+                  class: "glyphicon glyphicon-trash",
+                  style: {
+                    color: "#CC3300",
+                  }
+                })]),
+              ]) : null
+          ])
+        },
+      },
+    ],
+    eventCustomOption: {
+      // header 列事件自定义
+      headerCellEvents: ({ column,rowIndx }) => {
+        return {
+          click: (event) => vm.mtimeTypeFromNow = !vm.mtimeTypeFromNow,
+        };
+      },
+    },
     user: {
       email: "",
       name: "",
@@ -426,6 +557,9 @@ function loadFileList(pathname) {
           return -weight * f.mtime;
         })
         vm.files = res.files;
+        vm.virtualScrollOption = {
+          enable: res.files.length > 1000,
+        }
         vm.auth = res.auth;
         const configs = res.configs;
         prefixReflect = configs?.prefixReflect;
@@ -455,13 +589,7 @@ function loadFileList(pathname) {
         showErrorMessage(jqXHR)
       },
     });
-
   }
-
-  // vm.previewMode = getQueryString("raw") == "false";
-  // if (vm.previewMode) {
-  //   vm.loadPreviewFile();
-  // }
   return retObj
 }
 

@@ -215,32 +215,32 @@ func (s *HTTPStaticServer) checkToken(w http.ResponseWriter, r *http.Request, pa
 }
 
 // func (s *HTTPStaticServer) checkVisibility(patterns, ignores []glob.Glob, path string) bool {
-func (s *HTTPStaticServer) checkVisibility(patterns, ignores []string, path string) bool {
-	match_patterns := true
-	not_ignore := false
-	if s.PinRoot {
-		if len(patterns) == 0 && len(ignores) == 0 {
-			return true
-		}
-		for _, pattern := range patterns {
-			// if pattern.Match(path) {
-			if common.CheckPath(pattern, path) {
-				match_patterns = true
-				break
-			}
-			match_patterns = false
-		}
+// func (s *HTTPStaticServer) checkVisibility(patterns, ignores []string, path string) bool {
+// 	match_patterns := true
+// 	not_ignore := false
+// 	if s.PinRoot {
+// 		if len(patterns) == 0 && len(ignores) == 0 {
+// 			return true
+// 		}
+// 		for _, pattern := range patterns {
+// 			// if pattern.Match(path) {
+// 			if common.CheckPath(pattern, path) {
+// 				match_patterns = true
+// 				break
+// 			}
+// 			match_patterns = false
+// 		}
 
-		for _, ignore := range ignores {
-			// if ignore.Match(path) {
-			if common.CheckPath(ignore, path) {
-				not_ignore = true
-				break
-			}
-		}
-	}
-	return match_patterns && !not_ignore
-}
+// 		for _, ignore := range ignores {
+// 			// if ignore.Match(path) {
+// 			if common.CheckPath(ignore, path) {
+// 				not_ignore = true
+// 				break
+// 			}
+// 		}
+// 	}
+// 	return match_patterns && !not_ignore
+// }
 
 func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 	path := mux.Vars(r)["path"]
@@ -862,7 +862,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
-	dirInfoMap := make(map[string]os.DirEntry, 0)
 	search := r.FormValue("search")
 	if search != "" {
 		results := s.findIndex(search)
@@ -871,14 +870,21 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			if index > 50 {
 				break
 			}
-			if strings.HasPrefix(item.Path, requestPath) && s.checkVisibility(patterns, ignores, filepath.Join(s.Root, item.Path)) {
+			// if strings.HasPrefix(item.Path, requestPath) && s.checkVisibility(patterns, ignores, filepath.Join(s.Root, item.Path)) {
+			if strings.HasPrefix(item.Path, requestPath) {
 				fileInfoMap[item.Path] = item.Info
 				index++
 			}
 		}
 	} else {
 		start := time.Now()
-		infos, err := os.ReadDir(realPath)
+		f, err := os.Open(realPath)
+		if err != nil {
+			http.Error(w, err.Error(), 500)
+			return
+		}
+		infos, err := f.Readdir(-1)
+
 		elapsed := time.Since(start)
 		fmt.Printf("\x1b[32m 查询文件的时间是: %v \x1b[0m\n", elapsed)
 		if err != nil {
@@ -887,9 +893,10 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		start = time.Now()
 		for _, info := range infos {
-			if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
-				dirInfoMap[filepath.Join(requestPath, info.Name())] = info
-			}
+			// if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
+			// 	fileInfoMap[filepath.Join(requestPath, info.Name())] = info
+			// }
+			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
 		}
 		elapsed = time.Since(start)
 		fmt.Printf("\x1b[32m 第 1 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
@@ -919,7 +926,8 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
 			lr.Type = "dir"
-			lr.Size = s.historyDirSize(lr.Path)
+			// lr.Size = s.historyDirSize(lr.Path)
+			lr.Size = info.Size()
 		} else {
 			lr.Type = "file"
 			lr.Size = info.Size() // formatSize(info)
@@ -928,43 +936,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	}
 	elapsed := time.Since(start)
 	fmt.Printf("\x1b[32m 第 2 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
-
-	start = time.Now()
-	for path, info := range dirInfoMap {
-		if !auth.canAccess(info.Name()) {
-			continue
-		}
-		_info, err := info.Info()
-		if err != nil {
-			log.Fatal("get dir info failed", err)
-			continue
-		}
-		lr := HTTPFileInfo{
-			Name:    _info.Name(),
-			Path:    path,
-			ModTime: _info.ModTime().UnixNano() / 1e6,
-		}
-		if search != "" {
-			name, err := filepath.Rel(requestPath, path)
-			if err != nil {
-				log.Println(requestPath, path, err)
-			}
-			lr.Name = filepath.ToSlash(name) // fix for windows
-		}
-		if info.IsDir() {
-			name := info.Name()
-			lr.Name = name
-			lr.Path = filepath.Join(filepath.Dir(path), name)
-			lr.Type = "dir"
-			lr.Size = s.historyDirSize(lr.Path)
-		} else {
-			lr.Type = "file"
-			lr.Size = _info.Size() // formatSize(info)
-		}
-		lrs = append(lrs, lr)
-	}
-	elapsed = time.Since(start)
-	fmt.Printf("\x1b[32m 第 3 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 
 	prefixReflects := make([]string, len(prefixReflect))
 	for i, re := range prefixReflect {
@@ -986,6 +957,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		newLrs = append(newLrs, l)
 	}
+
 	data, _ := json.Marshal(map[string]interface{}{
 		"files": newLrs,
 		"auth":  auth,

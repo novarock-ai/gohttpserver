@@ -122,7 +122,7 @@ var vm = new Vue({
             return null
           }
           auth = vm.auth;
-          allowZip = row.size < 1024 * 1024 * 200;
+          allowZip = row.size < 1024 * 1024 * 100;
           return h('div', {
             class: "actions",
             style: { "text-align": "center" },

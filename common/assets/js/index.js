@@ -183,7 +183,7 @@ var vm = new Vue({
                 auth.delete && h('button', {
                   class: "btn btn-default btn-xs",
                   on: {
-                    click: (e) => vm.deletePathConfirm(item, e)
+                    click: (e) => vm.deletePathConfirm(row, e)
                   }
                 }, [h('span', {
                   class: "glyphicon glyphicon-trash",

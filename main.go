@@ -34,6 +34,7 @@ type Configure struct {
 	Port          int              `yaml:"port"`
 	Root          string           `yaml:"root"`
 	Prefix        string           `yaml:"prefix"`
+	AssetsPrefix  string           `yaml:"assets-prefix"`
 	PrefixReflect []*regexp.Regexp `yaml:"prefix-reflect"`
 	// This feature of `PinRoot` must be used with a gateway
 	PinRoot           bool   `yaml:"pin-root"`
@@ -116,6 +117,7 @@ func parseFlags() error {
 	kingpin.Flag("conf", "config file path, yaml format").FileVar(&gcfg.Conf)
 	kingpin.Flag("root", "root directory, default ./").Short('r').StringVar(&gcfg.Root)
 	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
+	kingpin.Flag("assets-prefix", "assets url prefix, eg /assets").StringVar(&gcfg.AssetsPrefix)
 	kingpin.Flag("prefix-reflect", "url prefix reflect, eg /foo/bar will be reflected to /").RegexpListVar(&gcfg.PrefixReflect)
 	kingpin.Flag("pin-root", "pin root directory, default false").BoolVar(&gcfg.PinRoot)
 	kingpin.Flag("not-exist-auto-mkdir", "auto make the dir that not exist, default false").BoolVar(&gcfg.NotExistAutoMkdir)
@@ -181,6 +183,8 @@ func main() {
 		log.Printf("url prefix: %s", gcfg.Prefix)
 	}
 
+	// gcfg.AssetsPrefix = fixPrefix(gcfg.AssetsPrefix)
+
 	// fmt.Println(gcfg.PrefixReflect[0].String())
 
 	ss := server.NewHTTPStaticServer(gcfg.Root)
@@ -190,6 +194,7 @@ func main() {
 	// }
 
 	ss.Prefix = gcfg.Prefix
+	ss.AssetsPrefix = gcfg.AssetsPrefix
 	ss.PrefixReflect = gcfg.PrefixReflect
 	ss.PinRoot = gcfg.PinRoot
 	ss.NotExistAutoMkdir = gcfg.NotExistAutoMkdir

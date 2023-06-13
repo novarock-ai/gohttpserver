@@ -50,6 +50,7 @@ type Directory struct {
 type HTTPStaticServer struct {
 	Root              string
 	Prefix            string
+	AssetsPrefix      string
 	PrefixReflect     []*regexp.Regexp
 	PinRoot           bool
 	NotExistAutoMkdir bool
@@ -877,7 +878,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	} else {
-		start := time.Now()
 		f, err := os.Open(realPath)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -885,26 +885,20 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		infos, err := f.Readdir(-1)
 
-		elapsed := time.Since(start)
-		fmt.Printf("\x1b[32m 查询文件的时间是: %v \x1b[0m\n", elapsed)
 		if err != nil {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		start = time.Now()
 		for _, info := range infos {
 			// if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
 			// 	fileInfoMap[filepath.Join(requestPath, info.Name())] = info
 			// }
 			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
 		}
-		elapsed = time.Since(start)
-		fmt.Printf("\x1b[32m 第 1 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 	}
 
 	// turn file list -> json
 	lrs := make([]HTTPFileInfo, 0)
-	start := time.Now()
 	for path, info := range fileInfoMap {
 		if !auth.canAccess(info.Name()) {
 			continue
@@ -934,8 +928,6 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		lrs = append(lrs, lr)
 	}
-	elapsed := time.Since(start)
-	fmt.Printf("\x1b[32m 第 2 个 for 循环处理花费的时间: %v \x1b[0m\n", elapsed)
 
 	prefixReflects := make([]string, len(prefixReflect))
 	for i, re := range prefixReflect {

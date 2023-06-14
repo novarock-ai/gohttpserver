@@ -89,7 +89,7 @@
                 </div>
                 <div style="flex:1">
                   <div class="input-group">
-                    <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" />
+                    <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" @keyup.enter="searchFiles()" />
                     <span class="input-group-btn">
                       <button class="btn btn-default" @click="searchFiles()">
                         <span class="glyphicon glyphicon-search"></span>

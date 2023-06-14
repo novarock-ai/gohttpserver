@@ -301,6 +301,7 @@ var vm = new Vue({
     },
     searchFiles: function () {
       if (!this.search) {
+        loadFileList(this.homepage);
         return
       }
       const search = location.search ? location.search + `&search=${this.search}` : `?search=${this.search}`

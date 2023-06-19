@@ -8,7 +8,7 @@
       "console": "integratedTerminal",
       "args": [
         "-r",
-        "./var-ding-test", "--port", "80", "--pin-root", "--not-exist-auto-mkdir"],
+        "./var-ding-test", "--port", "9999", "--pin-root", "--not-exist-auto-mkdir"],
       "cwd": "${workspaceFolder}",
       "request": "launch",
       "program": "${workspaceRoot}/.",

@@ -802,6 +802,25 @@ type ResponseConfigs struct {
 	PrefixReflect []string `json:"prefixReflect"`
 }
 
+func (s *HTTPStaticServer) searchFromPath(root string) ([]IndexFileItem, error) {
+	var files = make([]IndexFileItem, 0)
+	var err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+			return filepath.SkipDir
+			// return err
+		}
+		if info.IsDir() {
+			return nil
+		}
+		path, _ = filepath.Rel(s.Root, path)
+		path = filepath.ToSlash(path)
+		files = append(files, IndexFileItem{path, info})
+		return nil
+	})
+	return files, err
+}
+
 func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	requestPath := mux.Vars(r)["path"]
 	realPath := s.getRealPath(r)
@@ -864,8 +883,17 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
 	search := r.FormValue("search")
+	searchFromPath := r.FormValue("search_from_path")
 	if search != "" {
-		results := s.findIndex(search)
+		var results []IndexFileItem
+		if searchFromPath == "true" {
+			results, _ = s.searchFromPath(filepath.Join(s.Root, requestPath))
+			if results != nil {
+				results = s.findIndex(search, results)
+			}
+		} else {
+			results = s.findIndex(search, nil)
+		}
 		index := 0
 		for _, item := range results {
 			if index > 50 {
@@ -1007,9 +1035,15 @@ func (s *HTTPStaticServer) historyDirSize(dir string) int64 {
 	return size
 }
 
-func (s *HTTPStaticServer) findIndex(text string) []IndexFileItem {
+func (s *HTTPStaticServer) findIndex(text string, indexes []IndexFileItem) []IndexFileItem {
 	ret := make([]IndexFileItem, 0)
-	for _, item := range s.indexes {
+	var currentIndexes []IndexFileItem
+	if indexes != nil && len(indexes) > 0 {
+		currentIndexes = indexes
+	} else {
+		currentIndexes = s.indexes
+	}
+	for _, item := range currentIndexes {
 		ok := true
 		// search algorithm, space for AND
 		for _, keyword := range strings.Fields(text) {

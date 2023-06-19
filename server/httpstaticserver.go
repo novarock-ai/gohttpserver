@@ -1038,7 +1038,7 @@ func (s *HTTPStaticServer) historyDirSize(dir string) int64 {
 func (s *HTTPStaticServer) findIndex(text string, indexes []IndexFileItem) []IndexFileItem {
 	ret := make([]IndexFileItem, 0)
 	var currentIndexes []IndexFileItem
-	if indexes != nil && len(indexes) > 0 {
+	if len(indexes) > 0 {
 		currentIndexes = indexes
 	} else {
 		currentIndexes = s.indexes
@@ -1055,7 +1055,7 @@ func (s *HTTPStaticServer) findIndex(text string, indexes []IndexFileItem) []Ind
 			if keyword == "" {
 				continue
 			}
-			ok = (needContains == strings.Contains(strings.ToLower(item.Path), strings.ToLower(keyword)))
+			ok = (needContains == strings.Contains(strings.ToLower(item.Info.Name()), strings.ToLower(keyword)))
 			if !ok {
 				break
 			}

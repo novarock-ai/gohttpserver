@@ -368,7 +368,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 			mimetype := mime.TypeByExtension(ext)
 			log.Println("mimetype: ", mimetype)
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
-			w.Header().Set("Content-Type", mimetype)
+			w.Header().Set("Content-Type", "application/force-download")
 		} else {
 			if s.NotExistAutoMkdir {
 				_, err := os.Stat(realPath)

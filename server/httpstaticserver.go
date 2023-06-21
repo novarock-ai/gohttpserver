@@ -364,6 +364,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		}
 		if r.FormValue("download") == "true" {
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
+			w.Header().Set("Content-Type", "application/octet-stream")
 		} else {
 			if s.NotExistAutoMkdir {
 				_, err := os.Stat(realPath)

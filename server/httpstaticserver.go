@@ -8,6 +8,7 @@ import (
 	"io"
 	"io/fs"
 	"log"
+	"mime"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -363,8 +364,11 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 		if r.FormValue("download") == "true" {
+			ext := filepath.Ext(path)
+			mimetype := mime.TypeByExtension(ext)
+			log.Println("mimetype: ", mimetype)
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
-			w.Header().Set("Content-Type", "application/octet-stream")
+			w.Header().Set("Content-Type", mimetype)
 		} else {
 			if s.NotExistAutoMkdir {
 				_, err := os.Stat(realPath)

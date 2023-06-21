@@ -8,7 +8,7 @@ var-ding-test
 # Folders
 _obj
 _test
-__dubg_bin
+__debug_bin
 
 # Architecture specific extensions/prefixes
 *.[568vq]

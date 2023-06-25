@@ -49,24 +49,23 @@ type Directory struct {
 }
 
 type HTTPStaticServer struct {
-	Root                       string
-	Prefix                     string
-	AssetsPrefix               string
-	PrefixReflect              []*regexp.Regexp
-	PinRoot                    bool
-	NotExistAutoMkdir          bool
-	Token                      string
-	Upload                     bool
-	Delete                     bool
-	Folder                     bool
-	Download                   bool
-	Archive                    bool
-	Title                      string
-	Theme                      string
-	PlistProxy                 string
-	AuthType                   string
-	INTERNAL_CUSTOM_JS_SCRIPTS []string
-	INTERNAL_USE_CUSTOM_JS     bool
+	Root                   string
+	Prefix                 string
+	AssetsPrefix           string
+	PrefixReflect          []*regexp.Regexp
+	PinRoot                bool
+	NotExistAutoMkdir      bool
+	Token                  string
+	Upload                 bool
+	Delete                 bool
+	Folder                 bool
+	Download               bool
+	Archive                bool
+	Title                  string
+	Theme                  string
+	PlistProxy             string
+	AuthType               string
+	INTERNAL_USE_CHINA_CDN bool
 
 	indexes []IndexFileItem
 	m       *mux.Router
@@ -96,11 +95,10 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	fmt.Println("customJsList: ", customJsList)
 	m := mux.NewRouter()
 	s := &HTTPStaticServer{
-		Root:                       root,
-		Theme:                      "black",
-		INTERNAL_CUSTOM_JS_SCRIPTS: customJsList,
-		INTERNAL_USE_CUSTOM_JS:     useCustomCDN,
-		m:                          m,
+		Root:                   root,
+		Theme:                  "black",
+		INTERNAL_USE_CHINA_CDN: false,
+		m:                      m,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},

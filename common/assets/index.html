@@ -128,11 +128,19 @@
   [[ end ]]
 
 
-  [[if .INTERNAL_USE_CUSTOM_JS]]
+  [[if .INTERNAL_USE_CHINA_CDN]]
   
-  [[range $index, $value := .INTERNAL_CUSTOM_JS_SCRIPTS]]
-  <script src="[[$value]]"></script>
-  [[end]]
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/48a7f08aaef7444b82b991243bd8d595/jquery.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/9f416e57817c4ecf83b4d0d9ee892931/jquery.scrollUp.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/f2bbbb8f4a794172b62579be195f7707/vue.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/3193ef24ada64122a3c210200eeb605a/showdown.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/2c5481ec35e54e2691d295106155897f/moment.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/0eb0284d18ae49888a7fd5f6bea27068/dropzone.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/4604c9c0163b441aa9ecab1445bd556f/underscore-umd-min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/5053d8eced0e43ff9ed62f9257d8d914/clipboard.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/5f7797d88faf49dcbb63da9608ec3564/bootstrap.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/516e36ba34374e84bc0edd87c3d197d9/iframeResizer.contentWindow.min.js"></script>
+  <script src="https://static01.dp.tech/openfiles.mlops.dp.tech/projects/launching/6c67b6b1768245e9ad572e1f8641a447/vue-easytable.min.js"></script>
 
   [[else]]
 

@@ -49,23 +49,24 @@ type Directory struct {
 }
 
 type HTTPStaticServer struct {
-	Root              string
-	Prefix            string
-	AssetsPrefix      string
-	PrefixReflect     []*regexp.Regexp
-	PinRoot           bool
-	NotExistAutoMkdir bool
-	Token             string
-	Upload            bool
-	Delete            bool
-	Folder            bool
-	Download          bool
-	Archive           bool
-	Title             string
-	Theme             string
-	PlistProxy        string
-	GoogleTrackerID   string
-	AuthType          string
+	Root                       string
+	Prefix                     string
+	AssetsPrefix               string
+	PrefixReflect              []*regexp.Regexp
+	PinRoot                    bool
+	NotExistAutoMkdir          bool
+	Token                      string
+	Upload                     bool
+	Delete                     bool
+	Folder                     bool
+	Download                   bool
+	Archive                    bool
+	Title                      string
+	Theme                      string
+	PlistProxy                 string
+	AuthType                   string
+	INTERNAL_CUSTOM_JS_SCRIPTS []string
+	INTERNAL_USE_CUSTOM_JS     bool
 
 	indexes []IndexFileItem
 	m       *mux.Router
@@ -84,11 +85,22 @@ func NewHTTPStaticServer(root string) *HTTPStaticServer {
 		root = root + "/"
 	}
 	log.Printf("root path: %s\n", root)
+	customJsScripts := os.Getenv("CUSTOM_JS_SCRIPT")
+	var customJsList []string
+	useCustomCDN := false
+	if customJsScripts != "" {
+		customJsList = strings.Split(customJsScripts, ";")
+		useCustomCDN = true
+	}
+	fmt.Println("useCustomCDN: ", useCustomCDN)
+	fmt.Println("customJsList: ", customJsList)
 	m := mux.NewRouter()
 	s := &HTTPStaticServer{
-		Root:  root,
-		Theme: "black",
-		m:     m,
+		Root:                       root,
+		Theme:                      "black",
+		INTERNAL_CUSTOM_JS_SCRIPTS: customJsList,
+		INTERNAL_USE_CUSTOM_JS:     useCustomCDN,
+		m:                          m,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},

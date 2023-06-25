@@ -53,7 +53,6 @@ type Configure struct {
 	PlistProxy        string `yaml:"plistproxy"`
 	Title             string `yaml:"title"`
 	Debug             bool   `yaml:"debug"`
-	GoogleTrackerID   string `yaml:"google-tracker-id"`
 	Auth              struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
@@ -109,7 +108,6 @@ func parseFlags() error {
 	gcfg.Theme = "black"
 	// gcfg.PlistProxy = defaultPlistProxy
 	// gcfg.Auth.OpenID = defaultOpenID
-	gcfg.GoogleTrackerID = "UA-81205425-2"
 	gcfg.Title = "Go HTTP File Server"
 
 	kingpin.HelpFlag.Short('h')
@@ -139,7 +137,6 @@ func parseFlags() error {
 	kingpin.Flag("debug", "enable debug mode").BoolVar(&gcfg.Debug)
 	kingpin.Flag("plistproxy", "plist proxy when server is not https").Short('p').StringVar(&gcfg.PlistProxy)
 	kingpin.Flag("title", "server title").StringVar(&gcfg.Title)
-	kingpin.Flag("google-tracker-id", "set to empty to disable it").StringVar(&gcfg.GoogleTrackerID)
 
 	kingpin.Parse() // first parse conf
 
@@ -200,7 +197,6 @@ func main() {
 	ss.NotExistAutoMkdir = gcfg.NotExistAutoMkdir
 	ss.Theme = gcfg.Theme
 	ss.Title = gcfg.Title
-	ss.GoogleTrackerID = gcfg.GoogleTrackerID
 	ss.Upload = gcfg.Upload
 	ss.Delete = gcfg.Delete
 	ss.Folder = gcfg.Folder

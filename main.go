@@ -53,7 +53,7 @@ type Configure struct {
 	PlistProxy        string `yaml:"plistproxy"`
 	Title             string `yaml:"title"`
 	Debug             bool   `yaml:"debug"`
-	UseChinaCDN       bool   `yaml:"use-china-cdn"`
+	CustomCDN         string `yaml:"custom-cdn"`
 	Auth              struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
@@ -119,7 +119,7 @@ func parseFlags() error {
 	kingpin.Flag("assets-prefix", "assets url prefix, eg /assets").StringVar(&gcfg.AssetsPrefix)
 	kingpin.Flag("prefix-reflect", "url prefix reflect, eg /foo/bar will be reflected to /").RegexpListVar(&gcfg.PrefixReflect)
 	kingpin.Flag("pin-root", "pin root directory, default false").BoolVar(&gcfg.PinRoot)
-	kingpin.Flag("use-china-cdn", "use china cdn, default false").BoolVar(&gcfg.UseChinaCDN)
+	kingpin.Flag("custom-cdn", "Custom CDN url, eg https://cdn.jsdelivr.net").Default("https://cdn.jsdelivr.net").StringVar(&gcfg.CustomCDN)
 	kingpin.Flag("not-exist-auto-mkdir", "auto make the dir that not exist, default false").BoolVar(&gcfg.NotExistAutoMkdir)
 	kingpin.Flag("port", "listen port, default 8000").IntVar(&gcfg.Port)
 	kingpin.Flag("addr", "listen address, eg 127.0.0.1:8000").Short('a').StringVar(&gcfg.Addr)
@@ -205,7 +205,7 @@ func main() {
 	ss.Download = gcfg.Download
 	ss.Archive = gcfg.Archive
 	ss.AuthType = gcfg.Auth.Type
-	ss.INTERNAL_USE_CHINA_CDN = gcfg.UseChinaCDN
+	ss.CustomCDN = gcfg.CustomCDN
 
 	if gcfg.PlistProxy != "" {
 		u, err := url.Parse(gcfg.PlistProxy)

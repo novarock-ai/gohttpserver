@@ -10,4 +10,4 @@ COPY common/assets .
 COPY --from=builder /app/gohttpserver/gohttpserver .
 RUN apk add mailcap
 EXPOSE 9999
-ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root --not-exist-auto-mkdir --use-china-cdn"]
+ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root --not-exist-auto-mkdir --custom-cdn https://static01.dp.tech/openfiles.mlops.dp.tech/v2/static"]

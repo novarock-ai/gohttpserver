@@ -383,7 +383,9 @@ var vm = new Vue({
       parent.postMessage({
         event: getEventName("path_changed"),
         data: {
-          path: reqPath,
+          file: {
+            path: reqPath,
+          }
         }
       }, '*');
       loadFileOrDir(reqPath);

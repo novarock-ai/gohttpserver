@@ -463,7 +463,7 @@ var vm = new Vue({
         }
       }
       $.ajax({
-        url: this.getEncodePath(f.name),
+        url: this.getEncodePath(f.name) + location.search,
         method: 'DELETE',
         success: function (res) {
           loadFileList()
@@ -494,33 +494,6 @@ var vm = new Vue({
         })
       }
       return this.breadcrumb;
-    },
-    loadPreviewFile: function (filepath, e) {
-      if (e) {
-        e.preventDefault() // may be need a switch
-      }
-      var that = this;
-      $.getJSON(pathJoin(['/-/info', this.getLocationPathname()]))
-          .then(function (res) {
-            // console.log(res);
-            that.preview.filename = res.name;
-            that.preview.filesize = res.size;
-            return $.ajax({
-              url: '/' + res.path,
-              dataType: 'text',
-            });
-          })
-          .then(function (res) {
-            // console.log(res)
-            that.preview.contentHTML = '<pre>' + res + '</pre>';
-            // console.log("Finally")
-          })
-          .done(function (res) {
-            // console.log("done", res)
-          });
-    },
-    loadAll: function () {
-      // TODO: move loadFileList here
     },
   }
 })

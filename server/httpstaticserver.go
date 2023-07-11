@@ -12,12 +12,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
-
-	"regexp"
 
 	"github.com/codeskyblue/gohttpserver/auth"
 	"github.com/codeskyblue/gohttpserver/common"
@@ -66,6 +65,7 @@ type HTTPStaticServer struct {
 	PlistProxy        string
 	AuthType          string
 	CustomCDN         string
+	safeSymLinkRegex  *regexp.Regexp
 
 	indexes []IndexFileItem
 	m       *mux.Router
@@ -78,18 +78,24 @@ const AccessFolder = 0b00100000
 const AccessDownload = 0b00010000
 const AccessArchive = 0b00001000
 
-func NewHTTPStaticServer(root string) *HTTPStaticServer {
+func NewHTTPStaticServer(root string, safeSymlinkPattern string) *HTTPStaticServer {
 	root = filepath.ToSlash(filepath.Clean(root))
 	if !strings.HasSuffix(root, "/") {
 		root = root + "/"
 	}
 	log.Printf("root path: %s\n", root)
 
+	var safeSymLinkRegex *regexp.Regexp
+	if safeSymlinkPattern != "" {
+		safeSymLinkRegex = regexp.MustCompile(safeSymlinkPattern)
+	}
+
 	m := mux.NewRouter()
 	s := &HTTPStaticServer{
-		Root:  root,
-		Theme: "black",
-		m:     m,
+		Root:             root,
+		Theme:            "black",
+		m:                m,
+		safeSymLinkRegex: safeSymLinkRegex,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},
@@ -816,6 +822,34 @@ func (s *HTTPStaticServer) searchFromPath(root string) ([]IndexFileItem, error) 
 			return filepath.SkipDir
 			// return err
 		}
+		symLinkAbsPath, _ := filepath.Abs(filepath.Join(root, path))
+		if info.Mode()&os.ModeSymlink != 0 && s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(symLinkAbsPath) {
+			if realPath, err := filepath.EvalSymlinks(path); err == nil {
+				realPath, _ = filepath.Abs(realPath)
+				if sinfo, err := os.Stat(realPath); err == nil {
+					if sinfo.IsDir() {
+						if moreItems, err := s.searchFromPath(realPath); err == nil {
+							for i := range moreItems {
+								moreItems[i].Path = filepath.Join(info.Name(), moreItems[i].Path, moreItems[i].Info.Name())
+								moreItems[i].Path = filepath.ToSlash(moreItems[i].Path)
+							}
+							files = append(files, moreItems...)
+						} else {
+							log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+						}
+					} else {
+						rpath, _ := filepath.Rel(s.Root, realPath)
+						rpath = filepath.ToSlash(rpath)
+						files = append(files, IndexFileItem{rpath, info})
+					}
+				} else {
+					log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+				}
+			} else {
+				log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+			}
+			return nil
+		}
 		if info.IsDir() {
 			return nil
 		}
@@ -888,6 +922,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 
 	// path string -> info os.FileInfo
 	fileInfoMap := make(map[string]os.FileInfo, 0)
+	softLinksMap := make(map[string]bool, 0)
 	search := r.FormValue("search")
 	searchFromPath := r.FormValue("search_from_path")
 	if search != "" {
@@ -917,7 +952,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
-		infos, err := f.Readdir(-1)
+		infos, err := f.ReadDir(-1)
 
 		if err != nil {
 			http.Error(w, err.Error(), 500)
@@ -927,7 +962,18 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			// if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
 			// 	fileInfoMap[filepath.Join(requestPath, info.Name())] = info
 			// }
-			fileInfoMap[filepath.Join(requestPath, info.Name())] = info
+			if einfo, err := info.Info(); err == nil {
+				symLinkAbsPath, _ := filepath.Abs(filepath.Join(realPath, info.Name()))
+				if (info.Type() & fs.ModeSymlink) != 0 {
+					if s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(symLinkAbsPath) {
+						softLinksMap[filepath.Join(requestPath, info.Name())] = true
+					} else {
+						log.Printf("WARN: unsafe symlink: %s", symLinkAbsPath)
+						continue
+					}
+				}
+				fileInfoMap[filepath.Join(requestPath, info.Name())] = einfo
+			}
 		}
 	}
 
@@ -949,8 +995,23 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			}
 			lr.Name = filepath.ToSlash(name) // fix for windows
 		}
+
+		originName := info.Name()
+		if _, ok := softLinksMap[path]; ok {
+			lr.Name = info.Name()
+			if newPath, err := filepath.EvalSymlinks(path); err != nil {
+				continue
+			} else {
+				if fileInfo, err := os.Stat(newPath); err != nil {
+					continue
+				} else {
+					info = fileInfo
+				}
+			}
+		}
+
 		if info.IsDir() {
-			name := info.Name()
+			name := originName
 			lr.Name = name
 			lr.Path = filepath.Join(filepath.Dir(path), name)
 			lr.Type = "dir"
@@ -999,22 +1060,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 var dirInfoSize = Directory{size: make(map[string]int64), mutex: &sync.RWMutex{}}
 
 func (s *HTTPStaticServer) makeIndex() error {
-	var indexes = make([]IndexFileItem, 0)
-	var err = filepath.Walk(s.Root, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
-			return filepath.SkipDir
-			// return err
-		}
-		if info.IsDir() {
-			return nil
-		}
-
-		path, _ = filepath.Rel(s.Root, path)
-		path = filepath.ToSlash(path)
-		indexes = append(indexes, IndexFileItem{path, info})
-		return nil
-	})
+	indexes, err := s.searchFromPath(s.Root)
 	s.indexes = indexes
 	return err
 }

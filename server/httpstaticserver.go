@@ -927,8 +927,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	fileInfoMap := make(map[string]os.FileInfo, 0)
 	softLinksMap := make(map[string]bool, 0)
 	search := r.FormValue("search")
-	//searchFromPath := r.FormValue("search_from_path")
-	searchFromPath := "true"
+	searchFromPath := r.FormValue("search_from_path")
 	if search != "" {
 		var results []IndexFileItem
 		if searchFromPath == "true" {

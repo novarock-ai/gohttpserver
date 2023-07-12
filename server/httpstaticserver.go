@@ -814,7 +814,7 @@ type ResponseConfigs struct {
 	PrefixReflect []string `json:"prefixReflect"`
 }
 
-func (s *HTTPStaticServer) searchFromPath(root string) ([]IndexFileItem, error) {
+func (s *HTTPStaticServer) searchFromPath(root string, fromWeb bool) ([]IndexFileItem, error) {
 	var files = make([]IndexFileItem, 0)
 	var err = filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
@@ -822,25 +822,26 @@ func (s *HTTPStaticServer) searchFromPath(root string) ([]IndexFileItem, error) 
 			return filepath.SkipDir
 			// return err
 		}
-		symLinkAbsPath, _ := filepath.Abs(filepath.Join(root, path))
-		if info.Mode()&os.ModeSymlink != 0 && s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(symLinkAbsPath) {
+		if info.Mode()&os.ModeSymlink != 0 && s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(path) {
 			if realPath, err := filepath.EvalSymlinks(path); err == nil {
-				realPath, _ = filepath.Abs(realPath)
+				realPath, err = filepath.Abs(realPath)
+				if err != nil {
+					log.Println("realPath err:", realPath)
+				}
 				if sinfo, err := os.Stat(realPath); err == nil {
 					if sinfo.IsDir() {
-						if moreItems, err := s.searchFromPath(realPath); err == nil {
+						if moreItems, err := s.searchFromPath(realPath, fromWeb); err == nil {
 							for i := range moreItems {
-								moreItems[i].Path = filepath.Join(info.Name(), moreItems[i].Path, moreItems[i].Info.Name())
-								moreItems[i].Path = filepath.ToSlash(moreItems[i].Path)
+								apath := filepath.Join(s.Root, moreItems[i].Path)
+								rpath, _ := filepath.Rel(realPath, apath)
+								moreItems[i].Path = filepath.Join(path, rpath)
 							}
 							files = append(files, moreItems...)
 						} else {
 							log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
 						}
 					} else {
-						rpath, _ := filepath.Rel(s.Root, realPath)
-						rpath = filepath.ToSlash(rpath)
-						files = append(files, IndexFileItem{rpath, info})
+						files = append(files, IndexFileItem{path, sinfo})
 					}
 				} else {
 					log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
@@ -853,11 +854,13 @@ func (s *HTTPStaticServer) searchFromPath(root string) ([]IndexFileItem, error) 
 		if info.IsDir() {
 			return nil
 		}
-		path, _ = filepath.Rel(s.Root, path)
-		path = filepath.ToSlash(path)
 		files = append(files, IndexFileItem{path, info})
 		return nil
 	})
+	for i := range files {
+		files[i].Path, _ = filepath.Rel(s.Root, files[i].Path)
+		files[i].Path = filepath.ToSlash(files[i].Path)
+	}
 	return files, err
 }
 
@@ -928,7 +931,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 	if search != "" {
 		var results []IndexFileItem
 		if searchFromPath == "true" {
-			results, _ = s.searchFromPath(filepath.Join(s.Root, requestPath))
+			results, _ = s.searchFromPath(filepath.Join(s.Root, requestPath), true)
 			if results != nil {
 				results = s.findIndex(search, results)
 			}
@@ -999,10 +1002,13 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		originName := info.Name()
 		if _, ok := softLinksMap[path]; ok {
 			lr.Name = info.Name()
-			if newPath, err := filepath.EvalSymlinks(path); err != nil {
+			rpath := filepath.Join(s.Root, path)
+			if newPath, err := filepath.EvalSymlinks(rpath); err != nil {
+				log.Println("WARN: EvalSymlinks failed", rpath, err)
 				continue
 			} else {
 				if fileInfo, err := os.Stat(newPath); err != nil {
+					log.Println("WARN: os.Stat failed", newPath, err)
 					continue
 				} else {
 					info = fileInfo
@@ -1060,7 +1066,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 var dirInfoSize = Directory{size: make(map[string]int64), mutex: &sync.RWMutex{}}
 
 func (s *HTTPStaticServer) makeIndex() error {
-	indexes, err := s.searchFromPath(s.Root)
+	indexes, err := s.searchFromPath(s.Root, false)
 	s.indexes = indexes
 	return err
 }

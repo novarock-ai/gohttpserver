@@ -208,6 +208,7 @@ var vm = new Vue({
       email: "",
       name: "",
     },
+    showScrollTip: false,
     homepage: "/",
     location: window.location,
     breadcrumb: [],
@@ -244,6 +245,17 @@ var vm = new Vue({
       });
       return files;
     },
+  },
+  updated: function() {
+    // FIXME: vue-easytable scrolling invalid
+    const tableContainer = document.querySelector(".ve-table-container");
+    if (tableContainer) {
+      tableContainer.addEventListener('scroll', () => {
+        if (vm.showScrollTip) {
+          vm.showScrollTip = false;
+        }
+      })
+    }
   },
   created: function () {
     const that = this;
@@ -538,6 +550,7 @@ function loadFileList(pathname) {
           enable: res.files.length > 1000,
         }
         vm.auth = res.auth;
+        vm.showScrollTip = res.files.length >= 600 / 40;
         const configs = res.configs;
         prefixReflect = configs?.prefixReflect;
         pathname = decodeURIComponent(pathname)

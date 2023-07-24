@@ -881,19 +881,25 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		}
 		if claims != nil {
 			_patterns := (*claims)["patterns"].(string)
-			err := json.Unmarshal([]byte(_patterns), &patterns)
-			if err != nil {
-				log.Println("err: ", err)
+			if _patterns != "" {
+				err := json.Unmarshal([]byte(_patterns), &patterns)
+				if err != nil {
+					log.Println("err: ", err)
+				}
 			}
 			_ignores := (*claims)["ignores"].(string)
-			err = json.Unmarshal([]byte(_ignores), &ignores)
-			if err != nil {
-				log.Println("err: ", err)
+			if _ignores != "" {
+				err := json.Unmarshal([]byte(_ignores), &ignores)
+				if err != nil {
+					log.Println("err: ", err)
+				}
 			}
 			_extensions := (*claims)["extensions"].(string)
-			err = json.Unmarshal([]byte(_extensions), &extensions)
-			if err != nil {
-				log.Println("err: ", err)
+			if _extensions != "" {
+				err := json.Unmarshal([]byte(_extensions), &extensions)
+				if err != nil {
+					log.Println("err: ", err)
+				}
 			}
 		}
 

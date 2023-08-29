@@ -380,12 +380,14 @@ var vm = new Vue({
       return "fa-file-text-o"
     },
     clickFileOrDir: function (f, e) {
-      parent.postMessage({
-        event: getEventName(f.type == "dir" ? "dir_selected" : "file_selected"),
-        data: {
-          file: f,
-        }
-      }, '*');
+      if (f.type != "dir") {
+        parent.postMessage({
+          event: getEventName("file_selected"),
+          data: {
+            file: f,
+          }
+        }, '*');
+      }
       var reqPath = this.getEncodePath(f.name)
       f.type == "dir" && loadFileOrDir(reqPath);
       e.preventDefault()

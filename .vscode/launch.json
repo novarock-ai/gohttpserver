@@ -2,13 +2,13 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Launching Web",
+      "name": "Launch",
       "type": "go",
       "mode": "debug",
       "console": "integratedTerminal",
       "args": [
         "-r",
-        "./var-ding-test", "--port", "9999", "--pin-root", "--not-exist-auto-mkdir"],
+        "./var-ding-test", "--port", "9999", "--pin-root"],
       "cwd": "${workspaceFolder}",
       "request": "launch",
       "program": "${workspaceRoot}/.",

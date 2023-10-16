@@ -9,4 +9,4 @@ WORKDIR /app
 COPY common/assets .
 COPY --from=builder /app/gohttpserver/gohttpserver .
 EXPOSE 9999
-ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root --not-exist-auto-mkdir --custom-cdn https://static01.dp.tech/openfiles.mlops.dp.tech/v2/static"]
+ENTRYPOINT [ "/bin/sh", "-c", "--", "./gohttpserver -r $FILE_ROOT --port 9999 --pin-root --custom-cdn https://static01.dp.tech/openfiles.mlops.dp.tech/v2/static"]

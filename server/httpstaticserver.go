@@ -390,6 +390,9 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 				return
+			} else {
+				renderHTML(w, "assets/index.html", s)
+				return
 			}
 		}
 		http.ServeFile(w, r, realPath)

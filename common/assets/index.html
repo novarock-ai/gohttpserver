@@ -104,7 +104,7 @@
         </div>
 
         <div class="no-files" style="text-align: center;font-style: oblique;color: #333333a3;font-size: 18px; border-top: 1px solid #eee; padding-top: 10px;" v-if="!computedFiles.length">
-          no files
+          {{ noExistFlag ? "path not exist" : "no files" }}
         </div>
         <div class="scroll-down-tip" v-bind:class="showScrollTip ? 'show' : 'hidden'"></div>
         <ve-table

@@ -231,6 +231,7 @@ var vm = new Vue({
       type: "dir",
     }],
     myDropzone: null,
+    noExistFlag: false,
   },
   computed: {
     computedFiles: function () {
@@ -547,6 +548,7 @@ function loadFileList(pathname) {
           var weight = f.type == 'dir' ? 1000 : 1;
           return -weight * f.mtime;
         })
+        vm.noExistFlag = false;
         vm.files = res.files;
         vm.virtualScrollOption = {
           enable: res.files.length > 1000,
@@ -578,7 +580,9 @@ function loadFileList(pathname) {
         vm.updateBreadcrumb(pathname);
       },
       error: function (jqXHR, textStatus, errorThrown) {
-        showErrorMessage(jqXHR)
+        // showErrorMessage(jqXHR)
+        vm.noExistFlag = true;
+        vm.files = [];
       },
     });
   }

@@ -301,6 +301,10 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 				"extensions": "",
 			}
 
+			// NOTICE: 第一次请求服务器时从 url 的 query 获取 access 来判断服务端需要有哪些权限
+			// access 的权限由前端发过来 中间一定要经过一层 gateway 校验以保证权限合法才能到服务端
+			// 第一次请求前端页面时将经过网关校验的 token 嵌入到 html 中, 后续每次前端操作文件都带
+			// 上 token, 服务端根据 token 来判断每次操作是否合法
 			accessStr := r.FormValue("access")
 			if accessStr != "" {
 				access, err := strconv.Atoi(accessStr)
@@ -379,6 +383,13 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 		} else {
 			if s.NotExistAutoMkdir {
 				_, err := os.Stat(realPath)
+
+				currentPath := strings.Replace(path, s.AssetsPrefix, "", 1)
+				if err != nil && strings.HasPrefix(currentPath, "-") {
+					w.WriteHeader(http.StatusNotFound)
+					return
+				}
+
 				if err != nil && os.IsNotExist(err) {
 					err := s.AutoMkdir(realPath)
 					if err != nil {

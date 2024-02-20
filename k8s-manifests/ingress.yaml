@@ -8,6 +8,8 @@ metadata:
   annotations:
     nginx.ingress.kubernetes.io/auth-url: http://ingress-auth-gateway.project-launching.svc.cluster.local:8080/validate
     nginx.ingress.kubernetes.io/proxy-body-size: "500M"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "Access-Control-Allow-Origin: *";
 spec:
   rules:
     - host: artifacts.mlops.dp.tech

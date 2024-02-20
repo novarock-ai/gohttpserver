@@ -1,0 +1,151 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <meta name="theme-color" content="#000000">  
+  <title>[[.Title]]</title>
+  <link rel="shortcut icon" type="image/png" href="[[.AssetsPrefix]]/-/assets/favicon.png" />
+  <link rel="stylesheet" type="text/css" href="[[.AssetsPrefix]]/-/assets/css/style.css">
+  <link rel="stylesheet" type="text/css" href="[[.AssetsPrefix]]/-/assets/themes/[[.Theme]].css">
+
+  <link rel="stylesheet" href="[[.CustomCDN]]/npm/bootstrap@3.3.5/dist/css/bootstrap.min.css">
+  <link rel="stylesheet" href="[[.CustomCDN]]/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+  <link rel="stylesheet" href="[[.CustomCDN]]/npm/dropzone@5.9.3/dist/dropzone.css">
+  <link rel="stylesheet" href="[[.CustomCDN]]/npm/vue-easytable@2.27.0/libs/theme-default/index.css">
+</head>
+
+<body>
+  <div id="app">
+    <div class="container-wrapper" style="padding-left:unset;padding-right:unset">
+      <div class="col-md-12" id="content">
+        <!-- Upload modal-->
+        <div id="upload-modal" class="modal fade" tabindex="-1" role="dialog">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">
+                  <i class="fa fa-upload"></i> File upload
+                </h4>
+              </div>
+              <div class="modal-body">
+                <form action="#" class="dropzone" id="upload-form"></form>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-default" @click="removeAllUploads">RemoveAll</button>
+                <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- File info modal -->
+        <div id="file-info-modal" class="modal fade" tabindex="-1" role="dialog">
+          <div class="modal-dialog">
+            <div class="modal-content">
+              <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span aria-hidden="true">&times;</span></button>
+                <h4 class="modal-title">
+                  <span id="file-info-title"></span>
+                </h4>
+              </div>
+              <div class="modal-body">
+                <pre id="file-info-content"></pre>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div class="col-md-12 content-table" style="padding:unset;">
+        <div style="position:sticky;top:0;z-index:999;background-color:#fff">
+          <ol class="breadcrumb" style="background-color:#f8f6f0">
+            <li>
+              <a v-on:click='changePath(homepage, $event)' href="/"><i class="fa fa-home"></i></a>
+            </li>
+            <li v-for="bc in breadcrumb.slice(0, breadcrumb.length-1)">
+              <a v-on:click='changePath(homepage + "/" + bc.path, $event)' v-bind:href="bc.path">{{bc.name}}</a>
+            </li>
+            <li v-if="breadcrumb.length >= 1">
+              {{breadcrumb.slice(-1)[0].name}}
+            </li>
+          </ol>
+          <div style="display: flex;justify-content: space-between;align-items: center;margin-bottom:16px">
+            <tr>
+              <td colspan=4>
+                <div style="flex:1">
+                  <button class="btn btn-xs btn-default" v-on:click="backOnePath($event)">
+                    Back <i class="fa fa-arrow-left"></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-on:click='toggleHidden()'>
+                    Hidden <i class="fa" v-bind:class='showHidden ? "fa-eye" : "fa-eye-slash"'></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-show="auth.upload" data-toggle="modal" data-target="#upload-modal">
+                    Upload <i class="fa fa-upload"></i>
+                  </button>
+                  <button class="btn btn-xs btn-default" v-show="auth.folder" @click="makeDirectory">
+                    New Folder <i class="fa fa-folder"></i>
+                  </button>
+                </div>
+                <div style="flex:1">
+                  <div class="input-group">
+                    <input type="text" name="search" class="form-control" placeholder="Search text" v-model="search" @keyup.enter="searchFiles()" />
+                    <span class="input-group-btn">
+                      <button class="btn btn-default" @click="searchFiles()">
+                        <span class="glyphicon glyphicon-search"></span>
+                      </button>
+                    </span>
+                  </div>
+                </div>
+              </td>
+            </tr>
+          </div>
+        </div>
+
+        <div class="no-files" style="text-align: center;font-style: oblique;color: #333333a3;font-size: 18px; border-top: 1px solid #eee; padding-top: 10px;" v-if="!computedFiles.length">
+          {{ noExistFlag ? "path not exist" : "no files" }}
+        </div>
+        <div class="scroll-down-tip" v-bind:class="showScrollTip ? 'show' : 'hidden'"></div>
+        <ve-table
+          v-if="computedFiles.length"
+          row-key-field-name="name"
+          :max-height="600"
+          :cell-selection-option="cellSelectionOption"
+          :event-custom-option="eventCustomOption"
+          :virtual-scroll-option="virtualScrollOption"
+          :columns="columns"
+          :table-data="computedFiles"
+        />
+      </div>
+    </div>
+  </div>
+  <script>
+    window.URL_PFEFIX = "[[.Prefix]]"
+  </script>
+  [[if .PinRoot ]]
+  <script>
+    window.token = "[[.Token]]"
+  </script>
+  [[ end ]]
+
+  <script src="[[.CustomCDN]]/npm/jquery@3.6/dist/jquery.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/jquery.scrollup@2.4.1/dist/jquery.scrollUp.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/vue@2.7.14/dist/vue.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/showdown@2.1.0/dist/showdown.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/moment@2.29.4/moment.js"></script>
+  <script src="[[.CustomCDN]]/npm/dropzone@5.9.3/dist/min/dropzone.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/underscore@1.13.6/underscore-umd-min.js"></script>
+  <script src="[[.CustomCDN]]/npm/clipboard@1.5.12/dist/clipboard.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/bootstrap@3.3.5/dist/js/bootstrap.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/iframe-resizer@4.3.6/js/iframeResizer.contentWindow.min.js"></script>
+  <script src="[[.CustomCDN]]/npm/vue-easytable@2.27.0/libs/umd/index.min.js"></script>
+  
+  <script src='[[.AssetsPrefix]]/-/assets/[["js/index.js" | urlhash ]]'></script>
+  <!--Sync status bar color with border-color on mobile platforms.-->
+  <script>
+    var META = document.getElementsByTagName("meta");
+    META[2]["content"]=$('.navbar').css('border-color');
+  </script>
+</body>
+</html>

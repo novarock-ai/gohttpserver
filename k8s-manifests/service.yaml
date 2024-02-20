@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: launching-static-file-server
+  namespace: project-launching
+  labels:
+    app: launching-static-file-server
+spec:
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 9999
+  selector:
+    app: launching-static-file-server

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: launching-static-file-server-canary
+  namespace: project-launching
+  labels:
+    app: launching-static-file-server-canary
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: launching-static-file-server-canary
+  strategy:
+    rollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: launching-static-file-server-canary
+    spec:
+      containers:
+        - name: file-server
+          image: registry.dp.tech/mlops/launching-static-file-server:latest
+          imagePullPolicy: Always
+          command:
+            - /app/gohttpserver
+            - -r
+            - /shared_data/var
+            - --port
+            - "9999"
+            - --pin-root
+            - --custom-cdn
+            - "https://static01.dp.tech/openfiles.mlops.dp.tech/v2/static"
+            - --safe-symlink-pattern
+            - ^/shared_data/var/users/[^/]+/application_data/[^/]+/[^/]+/outputs$
+          env:
+            - name: PREFIX_REFLECT
+              value: "/users/[^/]+/?"
+            - name: PUBLIC_KEY_PATH
+              value: "/etc/fileserver/secrets/public.pem"
+            - name: PRIVATE_KEY_PATH
+              value: "/etc/fileserver/secrets/private.pem"
+          resources:
+            requests:
+              cpu: 1
+              memory: 2G
+            limits:
+              cpu: 4
+              memory: 8G
+          terminationMessagePolicy: FallbackToLogsOnError
+          volumeMounts:
+            - name: shared-data-volume
+              mountPath: /shared_data
+            - name: fileserver-rsa-mount
+              readOnly: true
+              mountPath: /etc/fileserver/secrets
+          startupProbe:
+            httpGet:
+              path: /
+              port: 9999
+            failureThreshold: 5
+            periodSeconds: 2
+      volumes:
+        - name: shared-data-volume
+          persistentVolumeClaim:
+            claimName: jfs-prod
+        - name: fileserver-rsa-mount
+          secret:
+            secretName: fileserver-rsa-secret
+      restartPolicy: Always

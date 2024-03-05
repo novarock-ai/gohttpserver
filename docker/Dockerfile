@@ -5,6 +5,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -ldflags '-X main.VERSION=docker' -o gohtt
 
 FROM alpine
 
+RUN apk add --no-cache mailcap
 WORKDIR /app
 COPY common/assets .
 COPY --from=builder /app/gohttpserver/gohttpserver .

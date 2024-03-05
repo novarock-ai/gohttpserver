@@ -59,6 +59,7 @@ type HTTPStaticServer struct {
 	Delete            bool
 	Folder            bool
 	Download          bool
+	Preview           bool
 	Archive           bool
 	Title             string
 	Theme             string
@@ -77,6 +78,7 @@ const AccessDelete = 0b01000000
 const AccessFolder = 0b00100000
 const AccessDownload = 0b00010000
 const AccessArchive = 0b00001000
+const AccessPreview = 0b00000100
 
 func NewHTTPStaticServer(root string, safeSymlinkPattern string) *HTTPStaticServer {
 	root = filepath.ToSlash(filepath.Clean(root))
@@ -195,6 +197,10 @@ func (s *HTTPStaticServer) getAccessFromToken(r *http.Request) (*UserControl, er
 		access.Download = val.(bool)
 	}
 
+	if val, ok := claims["preview"]; ok {
+		access.Preview = val.(bool)
+	}
+
 	if val, ok := claims["archive"]; ok {
 		access.Archive = val.(bool)
 	}
@@ -293,6 +299,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 				"root":       path,
 				"upload":     false,
 				"download":   false,
+				"preview":    false,
 				"archive":    false,
 				"delete":     false,
 				"folder":     false,
@@ -311,6 +318,7 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 				if err == nil {
 					claims["upload"] = (access & AccessUpload) == AccessUpload
 					claims["download"] = (access & AccessDownload) == AccessDownload
+					claims["preview"] = (access & AccessPreview) == AccessPreview
 					claims["archive"] = (access & AccessArchive) == AccessArchive
 					claims["delete"] = (access & AccessDelete) == AccessDelete
 					claims["folder"] = (access & AccessFolder) == AccessFolder
@@ -374,10 +382,15 @@ func (s *HTTPStaticServer) hIndex(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		}
-		if r.FormValue("download") == "true" {
+		if r.FormValue("preview") == "true" {
 			ext := filepath.Ext(path)
 			mimetype := mime.TypeByExtension(ext)
-			log.Println("mimetype: ", mimetype)
+			log.Println("preview mimetype: ", mimetype)
+			w.Header().Set("Content-Type", mimetype)
+		} else if r.FormValue("download") == "true" {
+			ext := filepath.Ext(path)
+			mimetype := mime.TypeByExtension(ext)
+			log.Println("download mimetype: ", mimetype)
 			w.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(filepath.Base(path)))
 			w.Header().Set("Content-Type", "application/force-download")
 		} else {
@@ -425,6 +438,7 @@ func (s *HTTPStaticServer) hDelete(w http.ResponseWriter, req *http.Request) {
 		auth.Delete = access.Delete
 		auth.Folder = access.Folder
 		auth.Download = access.Download
+		auth.Preview = access.Preview
 		auth.Archive = access.Archive
 	} else {
 		// path = filepath.Clean(path) // for safe reason, prevent path contain ..
@@ -464,6 +478,7 @@ func (s *HTTPStaticServer) hUploadOrMkdir(w http.ResponseWriter, req *http.Reque
 		auth.Delete = access.Delete
 		auth.Folder = access.Folder
 		auth.Download = access.Download
+		auth.Preview = access.Preview
 		auth.Archive = access.Archive
 	} else {
 		// check auth
@@ -678,6 +693,7 @@ type UserControl struct {
 	Delete   bool
 	Folder   bool
 	Download bool
+	Preview  bool
 	Archive  bool
 	Token    string
 }
@@ -687,6 +703,7 @@ type AccessConf struct {
 	Delete       bool          `yaml:"delete" json:"delete"`
 	Folder       bool          `yaml:"folder" json:"folder"`
 	Download     bool          `yaml:"download" json:"download"`
+	Preview      bool          `yaml:"preview" json:"preview"`
 	Archive      bool          `yaml:"archive" json:"archive"`
 	Users        []UserControl `yaml:"users" json:"users"`
 	AccessTables []AccessTable `yaml:"accessTables"`
@@ -764,6 +781,24 @@ func (c *AccessConf) canDownload(r *http.Request) bool {
 		}
 	}
 	return c.Download
+}
+
+func (c *AccessConf) canPreview(r *http.Request) bool {
+	session, err := auth.Store.Get(r, auth.DefaultSessionName)
+	if err != nil {
+		return c.Preview
+	}
+	val := session.Values["user"]
+	if val == nil {
+		return c.Preview
+	}
+	userInfo := val.(*auth.UserInfo)
+	for _, rule := range c.Users {
+		if rule.Email == userInfo.Email {
+			return rule.Preview
+		}
+	}
+	return c.Preview
 }
 
 func (c *AccessConf) canArchive(r *http.Request) bool {
@@ -934,12 +969,14 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 		auth.Delete = access.Delete
 		auth.Folder = access.Folder
 		auth.Download = access.Download
+		auth.Preview = access.Preview
 		auth.Archive = access.Archive
 	} else {
 		auth.Upload = auth.canUpload(r)
 		auth.Delete = auth.canDelete(r)
 		auth.Folder = auth.canNewFolder(r)
 		auth.Download = auth.canDownload(r)
+		auth.Preview = auth.canPreview(r)
 		auth.Archive = auth.canArchive(r)
 	}
 
@@ -1151,6 +1188,7 @@ func (s *HTTPStaticServer) defaultAccessConf() AccessConf {
 		Delete:   s.Delete,
 		Folder:   s.Folder,
 		Download: s.Download,
+		Preview:  s.Preview,
 		Archive:  s.Archive,
 	}
 	return ac

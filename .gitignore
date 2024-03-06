@@ -36,3 +36,5 @@ assets_vfsdata.go
 dist/
 
 var
+
+k8s-manifests

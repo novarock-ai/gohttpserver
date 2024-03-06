@@ -1,343 +1,206 @@
 # gohttpserver
-[![Build Status](https://travis-ci.org/codeskyblue/gohttpserver.svg?branch=master)](https://travis-ci.org/codeskyblue/gohttpserver)
-[![Docker Automated build](https://img.shields.io/docker/automated/codeskyblue/gohttpserver)](https://hub.docker.com/repository/docker/codeskyblue/gohttpserver)
 
-- Goal: Make the best HTTP File Server.
-- Features: Human-friendly UI, file uploading support, direct QR-code generation for Apple & Android install package.
+> NOTE: 本项目基于 `https://github.com/codeskyblue/gohttpserver` 进行了大量修改，不保证和原仓库功能完全兼容
 
-[Demo site](https://gohttpserver.herokuapp.com/)
 
-- 目标: 做最好的HTTP文件服务器
-- 功能: 人性化的UI体验，文件的上传支持，安卓和苹果安装包的二维码直接生成。
+- 基于 Vue2.x 以及 Golang 实现的高性能文件服务器
+- 使用 streamlit 或对文件在线预览有需求的可以参考[该项目(streamlit-file-browser)](https://github.com/pragmatic-streamlit/streamlit-file-browser)
 
-**Binaries** can be downloaded from [this repo releases](https://github.com/codeskyblue/gohttpserver/releases/)
 
 ## Requirements
 Tested with go-1.16
 
 ## Screenshots
-![screen](testdata/filetypes/gohttpserver.gif)
+![screen](./demo.gif)
 
 ## Features
-1. [x] Support QRCode code generate
-1. [x] Breadcrumb path quick change
-1. [x] All assets package to Standalone binary
-1. [x] Different file type different icon
-1. [x] Support show or hide hidden files
-1. [x] Upload support (auth by token or session)
-1. [x] README.md preview
-1. [x] HTTP Basic Auth
-1. [x] Partial reload pages when directory change
-1. [x] When only one dir under dir, path will combine two together
-1. [x] Directory zip download
-1. [x] Apple ipa auto generate .plist file, qrcode can be recognized by iphone (Require https)
-1. [x] Plist proxy
-1. [ ] Download count statistics
-1. [x] CORS enabled
-1. [ ] Offline download
-1. [ ] Code file preview
-1. [ ] Edit file support
-1. [x] Global file search
-1. [x] Hidden work `download` and `qrcode` in small screen
-1. [x] Theme select support
-1. [x] OK to working behide Nginx
-1. [x] \.ghs.yml support (like \.htaccess)
-1. [ ] Calculate md5sum and sha
-1. [ ] Folder upload
-1. [ ] Support sort by size or modified time
-1. [x] Add version info into index page
-1. [ ] Add api `/-/info/some.(apk|ipa)` to get detail info
-1. [x] Add api `/-/apk/info/some.apk` to get android package info
-1. [x] Auto tag version
-1. [x] Custom title support
-1. [x] Support setting from conf file
-1. [x] Quick copy download link
-1. [x] Show folder size
-1. [x] Create folder
-1. [x] Skip delete confirm when alt pressed
-1. [x] Support unzip zip file when upload(with form: unzip=true)
+
+1. [x] 文件基本的增删改查以及上传 
+3. [x] zip 归档
+4. [x] 虚拟滚动
+5. [x] 增量搜索
+6. [x] 支持精细到用户以及增,删,改,查等单独功能粒度的权限控制, 需要前置网关配合
+7. [x] 自定义静态文件 CDN
+8. [x] 安全 path 正则, 既可通过正则指定开发者希望或者不希望用户可以访问的 path
+9. [x] PinRoot, 既自由指定 path 前缀
+
 
 ## Installation
-```bash
-$ go install github.com/codeskyblue/gohttpserver@latest
-```
-
-Or download binaries from [github releases](https://github.com/codeskyblue/gohttpserver/releases)
-
-If you are using Mac, simply run command
-
-```bash
-$ brew install codeskyblue/tap/gohttpserver
-```
+当前请自行使用 golang 编译目标平台的二进制程序
 
 ## Usage
-Listen on port 8000 of all interfaces, and enable file uploading.
-
-```
-$ gohttpserver -r ./ --port 8000 --upload
+```bash
+gohttpserver -r ./var -p 8000 --pin-root
 ```
 
-Use command `gohttpserver --help` to see more usage.
 
 ## Docker Usage
-share current directory
 
 ```bash
-$ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver codeskyblue/gohttpserver
+# 该命令会自动编译 arm64 版本的镜像, 可以自己根据需求进行修改或添加
+$ make package
 ```
 
-Share current directory with http basic auth
-
+## Advanced Feature
+### PinRoot
 ```bash
-$ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver \
-  codeskyblue/gohttpserver \
-  --auth-type http --auth-http username:password
+gohttpserver -r ./your_path -p 8000 --pin-root
 ```
+开启 `--pin-root` 后, 当访问某个 path 的文件系统时, 会以第一次访问的 path 作为 root path。
+如当访问 `localhost:8000/nested_dir` 时会直接访问到 `root/nested_dir`，当未开启 `--pin-root` 时，点击回退按钮时会回退到 root 目录，而当开了 `--pin-root` 时，点击回退按钮则无法回退。
 
-Share current directory with openid auth. (Works only in netease company.)
 
+### Custom CDN
 ```bash
-$ docker run -it --rm -p 8000:8000 -v $PWD:/app/public --name gohttpserver \
-  codeskyblue/gohttpserver \
-  --auth-type openid
+gohttpserver -r ./your_path -p 8000 --custom-cdn "https://xxxx"
 ```
+指定此选项后，所有涉及到的静态资源都会走指定的 CDN，但必须保证改 CDN 上有全部依赖。
 
-To build image yourself, please change the PWD to the root of this repo.
-
+### SafeSymlinkPattern
 ```bash
-$ cd gohttpserver/
-$ docker build -t codeskyblue/gohttpserver -f docker/Dockerfile .
+gohttpserver -r ./your_path -p 8000 --safe-symlink-pattern "^/a/[^/]+/" --safe-symlink-pattern "^/b/[^/]+/"
+```
+支持指定匹配 path，可以传 List
+
+### Authorization
+为支持在项目运行时由业务侧动态控制不同用户或不同场景下的权限，因此该功能通过 query 传参的方式进行权限控制。如业务代码中可以通过如下方式创建服务器的访问链接，以在 streamlit 中使用为例，其他场景下原理类似，其中 `http://localhost:8000?access={access_all}` 就是要交给用户的服务器链接，其中对于权限通过 access 参数控制:
+```python
+    import streamlit as st
+    from streamlit_file_browser import st_file_browser
+    st.set_page_config(layout='wide')
+    
+    access_all = 0
+    access_upload = 0b10000000
+    access_delete = 0b01000000
+    access_folder = 0b00100000
+    access_download = 0b00010000
+    access_archive = 0b00001000
+    access_preview = 0b00000100
+    
+    access_all |= access_upload
+    access_all |= access_delete
+    access_all |= access_folder
+    access_all |= access_download
+    access_all |= access_archive
+    access_all |= access_preview
+    
+    print(1111, access_all)
+
+    st_file_browser('./',
+        key="deep1",
+        use_static_file_server=True,
+        static_file_server_path=f'http://localhost:8000?access={access_all}',
+    )
 ```
 
-## Authentication options
-- Enable basic http authentication
+不过 query 是一种不安全的方式，因此建议在访问链接之前加一层鉴权网关，可以参考如下代码：
+```python
+import jwt
+from fastapi import FastAPI, Request, Response
+import httpx
 
-  ```sh
-  $ gohttpserver --auth-type http --auth-http username:password
-  ```
+app = FastAPI()
 
-- Use openid auth
+SECRET_KEY = "my_secret_key"
 
-  ```sh
-  $ gohttpserver --auth-type openid --auth-openid https://login.example-hostname.com/openid/
-  ```
+def decode_jwt(token: str):
+    try:
+        decoded_payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+        return decoded_payload
+    except jwt.ExpiredSignatureError:
+        return "Token has expired"
+    except jwt.InvalidTokenError:
+        return "Invalid token"
 
-- Use oauth2-proxy with
 
-  ```sh
-  $ gohttpserver --auth-type oauth2-proxy
-  ```
-  You can configure to let a http reverse proxy handling authentication. 
-  When using oauth2-proxy, the backend will use identification info from request headers `X-Auth-Request-Email` as userId and `X-Auth-Request-Fullname` as user's display name. 
-  Please config your oauth2 reverse proxy yourself.
-  More about [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy).
-  
-  All required headers list as following.
+TARGET_URL = "http://localhost:8000" # gohttpserver path
 
-  |header|value|
-  |---|---|
-  |X-Auth-Request-Email| userId |
-  |X-Auth-Request-Fullname| user's display name(urlencoded) |
-  |X-Auth-Request-User| user's nickname (mostly email prefix) |
+@app.api_route("/{path:path}", methods=["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"])
+async def proxy(request: Request, path: str):
+    async with httpx.AsyncClient() as client:
+        url = f"{TARGET_URL}/{path}"
+        
+        if not path.startswith("-/assets") and not path.startswith("-/sysinfo") and path != "favicon.ico":
+            token = request.query_params.get("token")
+            decode_result = decode_jwt(token)
+            request_access = int(decode_result.get("access"))
+            if not request_access:
+                return Response(content="Access Denied", status_code=403)
+            current_access = int(request.query_params.get("access"))
+            if request_access != current_access:
+                return Response(content="Access Denied", status_code=403)
 
-- Enable upload
+        method = request.method
+        data = await request.body()
 
-  ```sh
-  $ gohttpserver --upload
-  ```
+        headers = dict(request.headers)
+        headers.pop("host", None)
 
-- Enable delete and Create folder
+        response = await client.request(
+            method=method,
+            url=url,
+            headers=headers,
+            content=data,
+            params=request.query_params
+        )
 
-  ```sh
-  $ gohttpserver --delete
-  ```
+        return Response(
+            content=response.content,
+            status_code=response.status_code,
+            headers=dict(response.headers)
+        )
 
-## Advanced usage
-Add access rule by creating a `.ghs.yml` file under a sub-directory. An example:
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=9999)
+```
+然后访问链接则需要加上 `token` 作为 query 参数：
+```python
+    import streamlit as st
+    from streamlit_file_browser import st_file_browser
+    st.set_page_config(layout='wide')
+    
+    access_all = 0
+    access_upload = 0b10000000
+    access_delete = 0b01000000
+    access_folder = 0b00100000
+    access_download = 0b00010000
+    access_archive = 0b00001000
+    access_preview = 0b00000100
+    
+    access_all |= access_upload
+    access_all |= access_delete
+    access_all |= access_folder
+    access_all |= access_download
+    access_all |= access_archive
+    access_all |= access_preview
+    
+    print(1111, access_all)
+    
+    import jwt
+    import datetime
+    
+    SECRET_KEY = "my_secret_key"
+    
+    def encode_jwt(payload: dict):
+        token = jwt.encode(payload, SECRET_KEY, algorithm="HS256")
+        return token
 
-```yaml
----
-upload: false
-delete: false
-users:
-- email: "codeskyblue@codeskyblue.com"
-  delete: true
-  upload: true
-  token: 4567gf8asydhf293r23r
+
+    payload = {
+        "access": access_all, 
+        "exp": datetime.datetime.now() + datetime.timedelta(hours=1)
+    }
+    file_server_token = encode_jwt(payload)
+
+    st_file_browser('./',
+        key="deep1",
+        use_static_file_server=True,
+        static_file_server_path=f'http://localhost:9999?access={access_all}&token={file_server_token}',
+    )
 ```
 
-In this case, if openid auth is enabled and user "codeskyblue@codeskyblue.com" has logged in, he/she can delete/upload files under the directory where the `.ghs.yml` file exits.
-
-`token` is used for upload. see [upload with curl](#upload-with-curl)
-
-For example, in the following directory hierarchy, users can delete/uploade files in directory `foo`, but he/she cannot do this in directory `bar`.
-
-```
-root -
-  |-- foo
-  |    |-- .ghs.yml
-  |    `-- world.txt 
-  `-- bar
-       `-- hello.txt
-```
-
-User can specify config file name with `--conf`, see [example config.yml](testdata/config.yml).
-
-To specify which files is hidden and which file is visible, add the following lines to `.ghs.yml`
-
-```yaml
-accessTables:
-- regex: block.file
-  allow: false
-- regex: visual.file
-  allow: true
-```
-
-### ipa plist proxy
-This is used for server on which https is enabled. default use <https://plistproxy.herokuapp.com/plist>
-
-```bash
-$ gohttpserver --plistproxy=https://someproxyhost.com/
-```
-
-Test if proxy works:
-
-```sh
-$ http POST https://someproxyhost.com/plist < app.plist
-{
-	"key": "18f99211"
-}
-$ http GET https://someproxyhost.com/plist/18f99211
-# show the app.plist content
-```
-
-If your ghs running behide nginx server and have https configed. plistproxy will be disabled automaticly.
-
-### Upload with CURL
-For example, upload a file named `foo.txt` to directory `somedir`
-
-```sh
-$ curl -F file=@foo.txt localhost:8000/somedir
-{"destination":"somedir/foo.txt","success":true}
-# upload with token
-$ curl -F file=@foo.txt -F token=12312jlkjafs localhost:8000/somedir
-{"destination":"somedir/foo.txt","success":true}
-
-# upload and change filename
-$ curl -F file=@foo.txt -F filename=hi.txt localhost:8000/somedir
-{"destination":"somedir/hi.txt","success":true}
-```
-
-Upload zip file and unzip it (zip file will be delete when finished unzip)
-
-```
-$ curl -F file=@pkg.zip -F unzip=true localhost:8000/somedir
-{"success": true}
-```
-
-Note: `\/:*<>|` are not allowed in filenames.
-
-### Deploy with nginx
-Recommended configuration, assume your gohttpserver listening on `127.0.0.1:8200`
-
-```
-server {
-  listen 80;
-  server_name your-domain-name.com;
-
-  location / {
-    proxy_pass http://127.0.0.1:8200; # here need to change
-    proxy_redirect off;
-    proxy_set_header  Host    $host;
-    proxy_set_header  X-Real-IP $remote_addr;
-    proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header  X-Forwarded-Proto $scheme;
-
-    client_max_body_size 0; # disable upload limit
-  }
-}
-```
-
-gohttpserver should started with `--xheaders` argument when behide nginx.
-
-Refs: <http://nginx.org/en/docs/http/ngx_http_core_module.html#client_max_body_size>
-
-gohttpserver also support `--prefix` flag which will help to when meet `/` is occupied by other service. relative issue <https://github.com/codeskyblue/gohttpserver/issues/105>
-
-Usage example:
-
-```bash
-# for gohttpserver
-$ gohttpserver --prefix /foo --addr :8200 --xheaders
-```
-
-**Nginx settigns**
-
-```
-server {
-  listen 80;
-  server_name your-domain-name.com;
-
-  location /foo {
-    proxy_pass http://127.0.0.1:8200; # here need to change
-    proxy_redirect off;
-    proxy_set_header  Host    $host;
-    proxy_set_header  X-Real-IP $remote_addr;
-    proxy_set_header  X-Forwarded-For $proxy_add_x_forwarded_for;
-    proxy_set_header  X-Forwarded-Proto $scheme;
-
-    client_max_body_size 0; # disable upload limit
-  }
-}
-```
-
-## FAQ
-- [How to generate self signed certificate with openssl](http://stackoverflow.com/questions/10175812/how-to-create-a-self-signed-certificate-with-openssl)
-
-### How the query is formated
-The search query follows common format rules just like Google. Keywords are seperated with space(s), keywords with prefix `-` will be excluded in search results.
-
-1. `hello world` means must contains `hello` and `world`
-1. `hello -world` means must contains `hello` but not contains `world`
-
-## Developer Guide
-Depdencies are managed by [govendor](https://github.com/kardianos/govendor)
-
-1. Build develop version. **assets** directory must exists
-
-  ```sh
-  $ go build
-  $ ./gohttpserver
-  ```
-2. Build single binary release
-
-  ```sh
-  $ go build
-  ```
-
-Theme are defined in [assets/themes](assets/themes) directory. Now only two themes are available, "black" and "green".
-
-
-## Reference Web sites
-
-* Core lib Vue <https://vuejs.org.cn/>
-* Icon from <http://www.easyicon.net/558394-file_explorer_icon.html>
-* Code Highlight <https://craig.is/making/rainbows>
-* Markdown Parser <https://github.com/showdownjs/showdown>
-* Markdown CSS <https://github.com/sindresorhus/github-markdown-css>
-* Upload support <http://www.dropzonejs.com/>
-* ScrollUp <https://markgoodyear.com/2013/01/scrollup-jquery-plugin/>
-* Clipboard <https://clipboardjs.com/>
-* Underscore <http://underscorejs.org/>
-
-**Go Libraries**
-
-* [vfsgen](https://github.com/shurcooL/vfsgen) Not using now
-* [go-bindata-assetfs](https://github.com/elazarl/go-bindata-assetfs) Not using now
-* <http://www.gorillatoolkit.org/pkg/handlers>
-
-## History
-The old version is hosted at <https://github.com/codeskyblue/gohttp>
+更具体的使用方法可参考[该链接](https://github.com/pragmatic-streamlit/streamlit-file-browser/issues/38)
 
 ## LICENSE
 This project is licensed under [MIT](LICENSE).

@@ -66,7 +66,7 @@ type HTTPStaticServer struct {
 	PlistProxy        string
 	AuthType          string
 	CustomCDN         string
-	safeSymLinkRegex  *regexp.Regexp
+	SafeSymLinkRegex  []*regexp.Regexp
 
 	indexes []IndexFileItem
 	m       *mux.Router
@@ -80,24 +80,18 @@ const AccessDownload = 0b00010000
 const AccessArchive = 0b00001000
 const AccessPreview = 0b00000100
 
-func NewHTTPStaticServer(root string, safeSymlinkPattern string) *HTTPStaticServer {
+func NewHTTPStaticServer(root string) *HTTPStaticServer {
 	root = filepath.ToSlash(filepath.Clean(root))
 	if !strings.HasSuffix(root, "/") {
 		root = root + "/"
 	}
 	log.Printf("root path: %s\n", root)
 
-	var safeSymLinkRegex *regexp.Regexp
-	if safeSymlinkPattern != "" {
-		safeSymLinkRegex = regexp.MustCompile(safeSymlinkPattern)
-	}
-
 	m := mux.NewRouter()
 	s := &HTTPStaticServer{
-		Root:             root,
-		Theme:            "black",
-		m:                m,
-		safeSymLinkRegex: safeSymLinkRegex,
+		Root:  root,
+		Theme: "black",
+		m:     m,
 		bufPool: sync.Pool{
 			New: func() interface{} { return make([]byte, 32*1024) },
 		},
@@ -871,34 +865,40 @@ func (s *HTTPStaticServer) searchFromPath(root string, fromWeb bool) ([]IndexFil
 			return filepath.SkipDir
 			// return err
 		}
-		if info.Mode()&os.ModeSymlink != 0 && s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(path) {
-			if realPath, err := filepath.EvalSymlinks(path); err == nil {
-				realPath, err = filepath.Abs(realPath)
-				if err != nil {
-					log.Println("realPath err:", realPath)
+		if info.Mode()&os.ModeSymlink != 0 && s.SafeSymLinkRegex != nil && len(s.SafeSymLinkRegex) > 0 {
+			for _, re := range s.SafeSymLinkRegex {
+				if !re.MatchString(path) {
+					continue
 				}
-				if sinfo, err := os.Stat(realPath); err == nil {
-					if sinfo.IsDir() {
-						if moreItems, err := s.searchFromPath(realPath, fromWeb); err == nil {
-							for i := range moreItems {
-								apath := filepath.Join(s.Root, moreItems[i].Path)
-								rpath, _ := filepath.Rel(realPath, apath)
-								moreItems[i].Path = filepath.Join(path, rpath)
+				if realPath, err := filepath.EvalSymlinks(path); err == nil {
+					realPath, err = filepath.Abs(realPath)
+					if err != nil {
+						log.Println("realPath err:", realPath)
+					}
+					if sinfo, err := os.Stat(realPath); err == nil {
+						if sinfo.IsDir() {
+							if moreItems, err := s.searchFromPath(realPath, fromWeb); err == nil {
+								for i := range moreItems {
+									apath := filepath.Join(s.Root, moreItems[i].Path)
+									rpath, _ := filepath.Rel(realPath, apath)
+									moreItems[i].Path = filepath.Join(path, rpath)
+								}
+								files = append(files, moreItems...)
+							} else {
+								log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
 							}
-							files = append(files, moreItems...)
 						} else {
-							log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+							files = append(files, IndexFileItem{path, sinfo})
 						}
 					} else {
-						files = append(files, IndexFileItem{path, sinfo})
+						log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
 					}
+					break
 				} else {
 					log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
 				}
-			} else {
-				log.Printf("WARN: Visit path: %s error: %v", strconv.Quote(path), err)
+				return nil
 			}
-			return nil
 		}
 		if info.IsDir() {
 			return nil
@@ -1018,6 +1018,7 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			http.Error(w, err.Error(), 500)
 			return
 		}
+	OuterLoop:
 		for _, info := range infos {
 			// if s.checkVisibility(patterns, ignores, filepath.Join(realPath, info.Name())) {
 			// 	fileInfoMap[filepath.Join(requestPath, info.Name())] = info
@@ -1025,11 +1026,18 @@ func (s *HTTPStaticServer) hJSONList(w http.ResponseWriter, r *http.Request) {
 			if einfo, err := info.Info(); err == nil {
 				symLinkAbsPath, _ := filepath.Abs(filepath.Join(realPath, info.Name()))
 				if (info.Type() & fs.ModeSymlink) != 0 {
-					if s.safeSymLinkRegex != nil && s.safeSymLinkRegex.MatchString(symLinkAbsPath) {
-						softLinksMap[filepath.Join(requestPath, info.Name())] = true
-					} else {
-						log.Printf("WARN: unsafe symlink: %s", symLinkAbsPath)
-						continue
+					if s.SafeSymLinkRegex != nil && len(s.SafeSymLinkRegex) > 0 {
+						flag := false
+						for _, re := range s.SafeSymLinkRegex {
+							if re.MatchString(symLinkAbsPath) {
+								softLinksMap[filepath.Join(requestPath, info.Name())] = true
+								flag = true
+								break
+							}
+						}
+						if !flag {
+							continue OuterLoop
+						}
 					}
 				}
 				fileInfoMap[filepath.Join(requestPath, info.Name())] = einfo

@@ -37,24 +37,24 @@ type Configure struct {
 	AssetsPrefix  string           `yaml:"assets-prefix"`
 	PrefixReflect []*regexp.Regexp `yaml:"prefix-reflect"`
 	// This feature of `PinRoot` must be used with a gateway
-	PinRoot            bool   `yaml:"pin-root"`
-	NotExistAutoMkdir  bool   `yaml:"not-exist-auto-mkdir"`
-	HTTPAuth           string `yaml:"httpauth"`
-	Cert               string `yaml:"cert"`
-	Key                string `yaml:"key"`
-	Cors               bool   `yaml:"cors"`
-	Theme              string `yaml:"theme"`
-	XHeaders           bool   `yaml:"xheaders"`
-	Upload             bool   `yaml:"upload"`
-	Delete             bool   `yaml:"delete"`
-	Folder             bool   `yaml:"folder"`
-	Download           bool   `yaml:"download"`
-	Archive            bool   `yaml:"archive"`
-	PlistProxy         string `yaml:"plistproxy"`
-	Title              string `yaml:"title"`
-	Debug              bool   `yaml:"debug"`
-	CustomCDN          string `yaml:"custom-cdn"`
-	SafeSymlinkPattern string `yaml:"safe-symlink-pattern"`
+	PinRoot            bool             `yaml:"pin-root"`
+	NotExistAutoMkdir  bool             `yaml:"not-exist-auto-mkdir"`
+	HTTPAuth           string           `yaml:"httpauth"`
+	Cert               string           `yaml:"cert"`
+	Key                string           `yaml:"key"`
+	Cors               bool             `yaml:"cors"`
+	Theme              string           `yaml:"theme"`
+	XHeaders           bool             `yaml:"xheaders"`
+	Upload             bool             `yaml:"upload"`
+	Delete             bool             `yaml:"delete"`
+	Folder             bool             `yaml:"folder"`
+	Download           bool             `yaml:"download"`
+	Archive            bool             `yaml:"archive"`
+	PlistProxy         string           `yaml:"plistproxy"`
+	Title              string           `yaml:"title"`
+	Debug              bool             `yaml:"debug"`
+	CustomCDN          string           `yaml:"custom-cdn"`
+	SafeSymlinkPattern []*regexp.Regexp `yaml:"safe-symlink-pattern"`
 	Auth               struct {
 		Type   string `yaml:"type"` // openid|http|github
 		OpenID string `yaml:"openid"`
@@ -117,7 +117,7 @@ func parseFlags() error {
 	kingpin.Flag("conf", "config file path, yaml format").FileVar(&gcfg.Conf)
 	kingpin.Flag("root", "root directory, default ./").Short('r').StringVar(&gcfg.Root)
 	kingpin.Flag("prefix", "url prefix, eg /foo").StringVar(&gcfg.Prefix)
-	kingpin.Flag("safe-symlink-pattern", "safe symlink pattern, eg ^/foo/bar").StringVar(&gcfg.SafeSymlinkPattern)
+	kingpin.Flag("safe-symlink-pattern", "safe symlink pattern, eg ^/foo/bar").RegexpListVar(&gcfg.SafeSymlinkPattern)
 	kingpin.Flag("assets-prefix", "assets url prefix, eg /assets").StringVar(&gcfg.AssetsPrefix)
 	kingpin.Flag("prefix-reflect", "url prefix reflect, eg /foo/bar will be reflected to /").RegexpListVar(&gcfg.PrefixReflect)
 	kingpin.Flag("pin-root", "pin root directory, default false").BoolVar(&gcfg.PinRoot)
@@ -188,7 +188,7 @@ func main() {
 
 	// fmt.Println(gcfg.PrefixReflect[0].String())
 
-	ss := server.NewHTTPStaticServer(gcfg.Root, gcfg.SafeSymlinkPattern)
+	ss := server.NewHTTPStaticServer(gcfg.Root)
 	// it will auto make dir if the gcfg.Root is not exist
 	// if gcfg.NotExistAutoMkdir {
 	// 	ss.AutoMkdir(gcfg.Root)
@@ -208,6 +208,7 @@ func main() {
 	ss.Archive = gcfg.Archive
 	ss.AuthType = gcfg.Auth.Type
 	ss.CustomCDN = gcfg.CustomCDN
+	ss.SafeSymLinkRegex = gcfg.SafeSymlinkPattern
 
 	if gcfg.PlistProxy != "" {
 		u, err := url.Parse(gcfg.PlistProxy)
